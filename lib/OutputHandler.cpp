@@ -63,7 +63,7 @@ bool OutputHandler::enable()
 	      return false;
 	    }
 
-	    if( S_OK != displayMode->GetFrameRate( &_timeValue, &_timeScale ) ) {
+	    if( S_OK != displayMode->GetFrameRate( &_frameDuration, &_timeScale ) ) {
 	      LOG(WARNING) << "Unable to get time rate information for output...";
 	      return false;
 	    }
@@ -88,34 +88,47 @@ bool OutputHandler::enable()
 	    return true;
 	  }
 
-	void OutputHandler::scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t count )
+	void OutputHandler::scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats )
 	{
 		LOG(DEBUG) << "Scheduling frame " << _totalFramesScheduled;
-		_deckLinkOutput->ScheduleVideoFrame(frame, _totalFramesScheduled*_timeValue, _timeValue*count, _timeScale );
-		_totalFramesScheduled += count;
+		deckLinkOutput()->ScheduleVideoFrame(frame, _totalFramesScheduled*_frameDuration,  _frameDuration*numRepeats, _timeScale );
+		//deckLinkOutput()->ScheduleVideoFrame(frame, _totalFramesScheduled*_timeValue,  1, _timeScale );
+		_totalFramesScheduled += numRepeats;
 	}
 
 	HRESULT	STDMETHODCALLTYPE OutputHandler::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
 	{
-		// LOG(INFO) << "Scheduling another frame";
+		BMDTimeValue frameCompletionTime = 0;
+		CHECK( deckLinkOutput()->GetFrameCompletionReferenceTimestamp( completedFrame, _timeScale, &frameCompletionTime ) == S_OK);
 
+		BMDTimeValue streamTime = 0;
+		double playbackSpeed = 0;
+		auto res = deckLinkOutput()->GetScheduledStreamTime(_timeScale, &streamTime, &playbackSpeed);
+
+
+		LOG(DEBUG) << "Completed a frame at " << frameCompletionTime << " with result " << result << " ; " << res << " " << streamTime << " " << playbackSpeed;
 		if( completedFrame != _blankFrame ) {
 			LOG(DEBUG) << "Completed frame != _blankFrame";
+			completedFrame->Release();
 		}
+
+		HRESULT r;
 
 		_buffer->getReadLock();
 		if( _buffer->buffer->len > 0 ) {
 			LOG(INFO) << "Scheduling frame with " << int(_buffer->buffer->len) << " bytes of BM SDI Commands";
-			scheduleFrame( makeFrameWithSDIProtocol( _deckLinkOutput, _buffer->buffer, true ) );
+			r = deckLinkOutput()->ScheduleVideoFrame( makeFrameWithSDIProtocol( _deckLinkOutput, _buffer->buffer, true ),
+		 																				streamTime, _frameDuration, _timeScale );
 			//scheduleFrame( addSDIProtocolToFrame( _deckLinkOutput, _blankFrame, _buffer->buffer ) );
-
-			//TODO: How to share this between two outputs
 			bmResetBuffer( _buffer->buffer );
 		} else {
 			// Otherwise schedule a blank frame
-			scheduleFrame( blankFrame() );
+			r = deckLinkOutput()->ScheduleVideoFrame( blankFrame(),
+		 																						streamTime, _frameDuration, _timeScale );
 		}
 		_buffer->releaseReadLock();
+
+		LOG_IF(WARNING, r != S_OK ) << "Scheduling not OK! " << result;
 
 		// Can I release the completeFrame?
 
@@ -123,7 +136,7 @@ bool OutputHandler::enable()
 	}
 
 bool OutputHandler::startStreams() {
-	if( !_enabled && !enable() ) return false;
+		if( !_enabled && !enable() ) return false;
 
 	LOG(DEBUG) << "Starting DeckLinkOutput streams ...";
 

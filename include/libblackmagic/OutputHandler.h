@@ -49,7 +49,7 @@ namespace libblackmagic {
 		IDeckLinkMutableVideoFrame *blankFrame()
 			{		if( !_blankFrame ) _blankFrame = makeBlueFrame(deckLinkOutput(), true ); return _blankFrame; }
 
-		void scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t count = 1 );
+		void scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats = 1 );
 
 	private:
 
@@ -60,7 +60,7 @@ namespace libblackmagic {
 		IDeckLinkOutput *_deckLinkOutput;
 
 		// Cached values
-		BMDTimeValue _timeValue;
+		BMDTimeValue _frameDuration;
 		BMDTimeScale _timeScale;
 
 		//BMSDIBuffer *_bmsdiBuffer;

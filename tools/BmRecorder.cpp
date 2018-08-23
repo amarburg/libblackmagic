@@ -255,7 +255,7 @@ int main( int argc, char** argv )
 
 			if( !noDisplay ) {
 
-				if( numImages == 1 ) {
+				if( numImages == 1 && !images[0].empty()  ) {
 					cv::imshow("Image", images[0]);
 				} else if ( numImages == 2 ) {
 
