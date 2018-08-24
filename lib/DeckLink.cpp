@@ -5,7 +5,7 @@
 
 #include "libg3logger/g3logger.h"
 
-#include "DeckLink.h"
+#include "libblackmagic/DeckLink.h"
 
 namespace libblackmagic {
 

@@ -1,7 +1,7 @@
 
 #include <cstring>
 
-#include "Identical3DFrames.h"
+#include "libblackmagic/Identical3DFrames.h"
 
 namespace libblackmagic {
 

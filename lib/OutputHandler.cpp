@@ -3,8 +3,8 @@
 
 #include <g3log/g3log.hpp>
 
-#include "SDICameraControl.h"
-#include "OutputHandler.h"
+#include "libblackmagic/SDICameraControl.h"
+#include "libblackmagic/OutputHandler.h"
 
 namespace libblackmagic {
 

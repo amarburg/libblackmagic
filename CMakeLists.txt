@@ -28,7 +28,7 @@ find_package( BlackmagicSDK REQUIRED )
 
 ## Set global include paths
 fips_include_directories(
-  ${CMAKE_CURRENT_SOURCE_DIR}/include
+  ${CMAKE_SOURCE_DIR}/include
   ${BLACKMAGIC_INCLUDE_DIR}
   ${OpenCV_INCLUDE_DIRS}
  )

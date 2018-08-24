@@ -35,8 +35,8 @@
 
 #include "g3log/g3log.hpp"
 
-#include "Identical3DFrames.h"
-#include "SDICameraControl.h"
+#include "libblackmagic/Identical3DFrames.h"
+#include "libblackmagic/SDICameraControl.h"
 
 namespace libblackmagic {
 
