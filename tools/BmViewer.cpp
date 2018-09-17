@@ -126,7 +126,7 @@ using cv::Mat;
 
 int main( int argc, char** argv )
 {
-	libg3log::G3Logger logger("bmRecorder");
+	libg3logger::G3Logger logger("bmRecorder");
 
 	signal( SIGINT, signal_handler );
 
