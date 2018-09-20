@@ -18,7 +18,10 @@ namespace libblackmagic {
     _deckLinkInput(  nullptr ),
     _deckLinkOutput( nullptr ),
     _grabbedImages(),
-    _queues()
+    _queues(),
+    _totalFramesScheduled(0),
+    _buffer( new SharedBMSDIBuffer() ),
+    _blankFrame( nullptr )
   {
     deckLink->AddRef(); }
 
@@ -38,10 +41,10 @@ namespace libblackmagic {
 
   //=== Lazy initializers ===
   IDeckLinkInput *InputHandler::deckLinkInput() {
-    if( !_deckLinkInput ) {
-      CHECK( _deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&_deckLinkInput) == S_OK );
-      CHECK( _deckLinkInput != NULL ) << "Couldn't get input for Decklink";
-    }
+    if( _deckLinkInput )  return _deckLinkInput;
+
+    CHECK( _deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&_deckLinkInput) == S_OK );
+    CHECK( _deckLinkInput != NULL ) << "Couldn't get input for Decklink";
 
     return _deckLinkInput;
   }
@@ -50,11 +53,8 @@ namespace libblackmagic {
   {
     if( _deckLinkOutput ) return _deckLinkOutput;
 
-    HRESULT result = _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput);
-    if (result != S_OK) {
-      CHECK( _deckLinkOutput != nullptr ) << "Couldn't get output for Decklink";
-      return nullptr;
-    }
+    CHECK( _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput) == S_OK );
+    CHECK( _deckLinkOutput != nullptr ) << "Couldn't get output for Decklink";
 
     return _deckLinkOutput;
   }
@@ -217,7 +217,7 @@ bool InputHandler::enableOutput() {
 
     startOutput();
 
-    LOG(INFO) << "Starting DeckLink inputs ....";
+    LOG(INFO) << "Starting DeckLink input streams ....";
 
     HRESULT result = deckLinkInput()->StartStreams();
     if (result != S_OK) {
@@ -234,7 +234,7 @@ bool InputHandler::enableOutput() {
 bool InputHandler::startOutput() {
   if( !_enabled && !enable() ) return false;
 
-  LOG(DEBUG) << "Starting DeckLinkOutput streams ...";
+  LOG(DEBUG) << "Starting DeckLink output streams ...";
 
   // // Pre-roll a few blank frames
   // const int prerollFrames = 3;
