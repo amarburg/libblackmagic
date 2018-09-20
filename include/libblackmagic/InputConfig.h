@@ -20,8 +20,8 @@ public:
     { _mode = m; return *this; }
 
 
-  bool           do3D()         { return _do3D; }
-  BMDDisplayMode mode()         { return _mode; }
+  bool           do3D() const     { return _do3D; }
+  BMDDisplayMode mode() const     { return _mode; }
 
 private:
   bool _do3D;

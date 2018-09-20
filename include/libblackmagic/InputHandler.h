@@ -26,6 +26,7 @@ namespace libblackmagic {
 
     // Retrieve the current configuration
     InputConfig &config() { return _config; }
+    void setConfig( const InputConfig &config ) { _config = config; }
 
     // Attempts to configure the input stream.   If not called explicitly,
     // will be called automatically by startStreams()

@@ -37,7 +37,7 @@ namespace libblackmagic {
     void listCards();
     void listInputModes();
 
-
+    IDeckLinkConfiguration *configuration();
 
     // These start and stop the input streams
     bool startStreams();
@@ -63,6 +63,7 @@ namespace libblackmagic {
     // For now assume an object uses just one Decklink board
     // COM model precludes use of auto ptrs
     IDeckLink *_deckLink;
+    IDeckLinkConfiguration *_configuration;
     // IDeckLinkInput *_deckLinkInput;
     // IDeckLinkOutput *_deckLinkOutput;
 

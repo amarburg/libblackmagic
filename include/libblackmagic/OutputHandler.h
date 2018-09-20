@@ -21,6 +21,8 @@ namespace libblackmagic {
 
 		// Retrieve the current configuration
     InputConfig &config() { return _config; }
+		void setConfig( const InputConfig &config ) { _config = config; }
+
 
 		// Lazy initializer
 		IDeckLinkOutput *deckLinkOutput();
@@ -31,6 +33,8 @@ namespace libblackmagic {
 
 		const std::shared_ptr<SharedBMSDIBuffer> &sdiProtocolBuffer()
 			{ return _buffer; }
+
+		void inputFormatChanged( BMDDisplayMode mode );
 
 		HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
 		HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void) {	return S_OK; }

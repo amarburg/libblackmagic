@@ -339,6 +339,8 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
       deckLinkInput()->FlushStreams();
       deckLinkInput()->StartStreams();
 
+      _deckLink->output().inputFormatChanged( mode->GetDisplayMode() );
+
     return S_OK;
   }
 

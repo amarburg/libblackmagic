@@ -17,7 +17,8 @@ namespace libblackmagic {
     // _deckLinkInput( nullptr ),
     // _deckLinkOutput( nullptr ),
     _inputHandler( nullptr  ),
-    _outputHandler( nullptr )
+    _outputHandler( nullptr ),
+    _configuration( nullptr )
   {
     CHECK( _deckLink != nullptr );
 
@@ -120,6 +121,16 @@ namespace libblackmagic {
 
   input->Release();
 
+}
+
+IDeckLinkConfiguration *DeckLink::configuration() {
+  if( !_configuration ) {
+    CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&_configuration) )
+                  << "Could not obtain the IDeckLinkConfiguration interface";
+    CHECK(_configuration != nullptr );
+  }
+
+  return _configuration;
 }
 
   //==== Lazy constructors ====
@@ -231,5 +242,5 @@ namespace libblackmagic {
     _outputHandler->stopStreams();
 
   }
-  
+
 }

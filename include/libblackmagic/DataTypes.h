@@ -11,5 +11,7 @@ enum {
 namespace libblackmagic {
 
   BMDDisplayMode stringToDisplayMode( const std::string &str );
+  const std::string displayModeToString( BMDDisplayMode mode );
+
 
 };
