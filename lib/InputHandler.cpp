@@ -160,34 +160,7 @@ bool InputHandler::enableInput() {
 
 bool InputHandler::enableOutput() {
 
-    BMDVideoOutputFlags outputFlags  = bmdVideoOutputVANC;
-    HRESULT result;
-
-    BMDDisplayModeSupport support;
-    IDeckLinkDisplayMode *displayMode = nullptr;
-
-    if( deckLinkOutput()->DoesSupportVideoMode( _config.mode(), 0, outputFlags, &support, &displayMode ) != S_OK) {
-      LOG(WARNING) << "Unable to find a query output modes";
-      return false;
-    }
-
-    if( support == bmdDisplayModeNotSupported ) {
-      LOG(WARNING) << "Display mode not supported";
-      return false;
-    }
-
-    // Enable video output
-    LOG(INFO) << "Enabled output with mode " << displayModeToString(_config.mode()) << " (0x" << std::hex <<  _config.mode() << ") and flags " << outputFlags;
-    result = deckLinkOutput()->EnableVideoOutput(_config.mode(), outputFlags );
-    if( result != S_OK ) {
-      LOG(WARNING) << "Could not enable video output, result = " << std::hex << result;
-      return false;
-    }
-
-    if( S_OK != displayMode->GetFrameRate( &_frameDuration, &_timeScale ) ) {
-      LOG(WARNING) << "Unable to get time rate information for output...";
-      return false;
-    }
+    setOutputMode( _config.mode() );
 
     //LOG(INFO) << "Time value " << _timeValue << " ; " << _timeScale;
 
@@ -200,7 +173,6 @@ bool InputHandler::enableOutput() {
     }
 
     // _config.setMode( displayMode->GetDisplayMode() );
-    displayMode->Release();
 
     scheduleFrame( blankFrame() );
 
@@ -210,6 +182,39 @@ bool InputHandler::enableOutput() {
 
 }
 
+bool InputHnalder::setOutputMode( BMDDisplayMode ) {
+  BMDVideoOutputFlags outputFlags  = bmdVideoOutputVANC;
+  HRESULT result;
+
+  BMDDisplayModeSupport support;
+  IDeckLinkDisplayMode *displayMode = nullptr;
+
+  if( deckLinkOutput()->DoesSupportVideoMode( _config.mode(), 0, outputFlags, &support, &displayMode ) != S_OK) {
+    LOG(WARNING) << "Unable to find a query output modes";
+    return false;
+  }
+
+  if( support == bmdDisplayModeNotSupported ) {
+    LOG(WARNING) << "Display mode not supported";
+    return false;
+  }
+
+  // Enable video output
+  LOG(INFO) << "Enabled output with mode " << displayModeToString(_config.mode()) << " (0x" << std::hex <<  _config.mode() << ") and flags " << outputFlags;
+  result = deckLinkOutput()->EnableVideoOutput(_config.mode(), outputFlags );
+  if( result != S_OK ) {
+    LOG(WARNING) << "Could not enable video output, result = " << std::hex << result;
+    return false;
+  }
+
+  if( S_OK != displayMode->GetFrameRate( &_frameDuration, &_timeScale ) ) {
+    LOG(WARNING) << "Unable to get time rate information for output...";
+    return false;
+  }
+
+  displayMode->Release();
+
+}
 
 //-------
   bool InputHandler::startStreams() {
@@ -444,6 +449,11 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
       deckLinkInput()->FlushStreams();
       deckLinkInput()->StartStreams();
 
+
+
+      stopOutput();
+      setOutputMode( mode->GetDisplayMode() );
+      startOutput();
 
       // And reconfigure output
 
