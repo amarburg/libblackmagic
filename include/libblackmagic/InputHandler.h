@@ -14,11 +14,14 @@
 #include "DataTypes.h"
 #include "InputConfig.h"
 
+#include "SDICameraControl.h"
+#include "SDIMessageBuffer.h"
+
 namespace libblackmagic {
 
 
 
-  class InputHandler : public IDeckLinkInputCallback
+  class InputHandler : public IDeckLinkInputCallback, public IDeckLinkVideoOutputCallback
   {
   public:
     InputHandler( IDeckLink *deckLink );
@@ -39,6 +42,8 @@ namespace libblackmagic {
     virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID iid, LPVOID *ppv) { return E_NOINTERFACE; }
     virtual ULONG STDMETHODCALLTYPE AddRef(void);
     virtual ULONG STDMETHODCALLTYPE  Release(void);
+
+    //== IDeckLinkInputCallback methods ==
     virtual HRESULT STDMETHODCALLTYPE VideoInputFormatChanged(BMDVideoInputFormatChangedEvents, IDeckLinkDisplayMode*, BMDDetectedVideoInputFormatFlags);
     virtual HRESULT STDMETHODCALLTYPE VideoInputFrameArrived(IDeckLinkVideoInputFrame*, IDeckLinkAudioInputPacket*);
 
@@ -51,13 +56,37 @@ namespace libblackmagic {
     int getRawImage( int i, cv::Mat &mat );
 
 
+    //== IDeckLinkOutputCallback methods ==
+    HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
+    HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void) {	return S_OK; }
+
+    const std::shared_ptr<SharedBMSDIBuffer> &sdiProtocolBuffer()
+			{ return _buffer; }
+
+
   protected:
 
+    // Break into two functions to reduce complexity
+    bool enableInput();
+    bool enableOutput();
+
+    bool startOutput();
+
+    bool stopOutput();
+
+
+    // Process input frames
     bool process( IDeckLinkVideoFrame *frame, int input = 0 );
 
     std::thread processInThread( IDeckLinkVideoFrame *frame, int input = 0 ) {
           return std::thread([=] { process(frame, input); });
       }
+
+
+    IDeckLinkMutableVideoFrame *blankFrame()
+			{		if( !_blankFrame ) _blankFrame = makeBlueFrame(deckLinkOutput(), true ); return _blankFrame; }
+
+		void scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats = 1 );
 
   private:
 
@@ -71,11 +100,24 @@ namespace libblackmagic {
 
     IDeckLink *_deckLink;
     IDeckLinkInput *_deckLinkInput;
-    IDeckLinkOutput *_deckLinkOutput;   /// N.b. this doesn't need to be the same as the card output,
-                                        // It's used to make new frames for conversion.
+    IDeckLinkOutput *_deckLinkOutput;
 
+    // == input member related variables ==
     std::array<cv::Mat,2> _grabbedImages;
     std::array<active_object::shared_queue< cv::Mat >,2> _queues;
+
+    //== output-related member variables ==
+
+		// Cached values
+		BMDTimeValue _frameDuration;
+		BMDTimeScale _timeScale;
+
+		//BMSDIBuffer *_bmsdiBuffer;
+
+		unsigned int _totalFramesScheduled;
+
+		std::shared_ptr<SharedBMSDIBuffer> _buffer;
+		IDeckLinkMutableVideoFrame *_blankFrame;
   };
 
 }

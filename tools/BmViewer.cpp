@@ -40,7 +40,7 @@ const int CamNum = 1;
 
 static void processKbInput( char c, DeckLink &decklink ) {
 
-	shared_ptr<SharedBMSDIBuffer> sdiBuffer( decklink.output().sdiProtocolBuffer() );
+	shared_ptr<SharedBMSDIBuffer> sdiBuffer( decklink.input().sdiProtocolBuffer() );
 
 	SDIBufferGuard guard( sdiBuffer );
 
@@ -224,7 +224,7 @@ int main( int argc, char** argv )
 			}
 
 			// Be careful not to exceed 255 byte buffer length
-			SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
+			SDIBufferGuard guard( deckLink.input().sdiProtocolBuffer() );
 			guard( [mode]( BMSDIBuffer *buffer ) {
 
 				bmAddOrdinalAperture( buffer, CamNum, 0 );

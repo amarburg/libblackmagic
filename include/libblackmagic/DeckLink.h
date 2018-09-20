@@ -7,7 +7,6 @@
 #include "libbmsdi/bmsdi_message.h"
 
 #include "InputHandler.h"
-#include "OutputHandler.h"
 #include "SDICameraControl.h"
 
 
@@ -45,7 +44,7 @@ namespace libblackmagic {
 
     // Lazy constructors
     InputHandler &input()     { return *_inputHandler; }
-    OutputHandler &output()   { return *_outputHandler; }
+    //OutputHandler &output()   { return *_outputHandler; }
 
     // // Pull images from _InputHandler
     // virtual bool grab( void );
@@ -68,7 +67,7 @@ namespace libblackmagic {
     // IDeckLinkOutput *_deckLinkOutput;
 
     InputHandler *_inputHandler;
-    OutputHandler *_outputHandler;
+    //OutputHandler *_outputHandler;
 
   };
 

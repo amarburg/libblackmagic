@@ -17,7 +17,7 @@ namespace libblackmagic {
     // _deckLinkInput( nullptr ),
     // _deckLinkOutput( nullptr ),
     _inputHandler( nullptr  ),
-    _outputHandler( nullptr ),
+    //_outputHandler( nullptr ),
     _configuration( nullptr )
   {
     CHECK( _deckLink != nullptr );
@@ -25,8 +25,8 @@ namespace libblackmagic {
     _inputHandler = new InputHandler( _deckLink );
     CHECK( _inputHandler != nullptr );
 
-    _outputHandler = new OutputHandler( _deckLink );
-    CHECK( _outputHandler  != nullptr );
+    // _outputHandler = new OutputHandler( _deckLink );
+    // CHECK( _outputHandler  != nullptr );
   }
 
   DeckLink::~DeckLink()
@@ -43,7 +43,7 @@ namespace libblackmagic {
     // }
 
     if( _inputHandler ) delete _inputHandler;
-    if( _outputHandler) delete _outputHandler;
+    //if( _outputHandler) delete _outputHandler;
 
     _deckLink->Release();
 
@@ -230,7 +230,7 @@ IDeckLinkConfiguration *DeckLink::configuration() {
   {
 
     // TODO.  Check responses
-    if( !_outputHandler->startStreams() ) return false;
+    //if( !_outputHandler->startStreams() ) return false;
     if( !_inputHandler->startStreams() ) return false;;
 
     return true;
@@ -239,7 +239,7 @@ IDeckLinkConfiguration *DeckLink::configuration() {
   void DeckLink::stopStreams( void )
   {
     _inputHandler->stopStreams();
-    _outputHandler->stopStreams();
+    //_outputHandler->stopStreams();
 
   }
 
