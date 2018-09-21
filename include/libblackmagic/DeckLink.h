@@ -23,7 +23,7 @@ namespace libblackmagic {
   	DeckLink( int cardno = 0 );
     ~DeckLink();
 
-    // Delete copy operators
+    // Delete the copy operators
     DeckLink( const DeckLink & ) = delete;
     DeckLink &operator=( const DeckLink & ) = delete;
 
@@ -40,8 +40,10 @@ namespace libblackmagic {
     void listCards();
     void listInputModes();
 
+    // InputConfig config() { return _config; }
+
     IDeckLink *deckLink() { return _deckLink; }
-    IDeckLinkConfiguration *configuration();
+    //IDeckLinkConfiguration *configuration();
 
     // These start and stop the input streams
     bool startStreams();
@@ -76,6 +78,8 @@ namespace libblackmagic {
 
     InputHandler  *_inputHandler;
     OutputHandler *_outputHandler;
+
+    // InputConfig _config;
 
     std::unique_ptr<active_object::Active> _thread;
 

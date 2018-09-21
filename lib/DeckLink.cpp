@@ -14,7 +14,7 @@ namespace libblackmagic {
 
   DeckLink::DeckLink( int cardNo )
   : _deckLink( createDeckLink( cardNo ) ),
-    _configuration( nullptr ),
+    //_configuration( nullptr ),
     _inputHandler( nullptr  ),
     _outputHandler( nullptr ),
     _thread( Active::createActive() )
@@ -122,16 +122,16 @@ namespace libblackmagic {
 
     }
 
-  IDeckLinkConfiguration *DeckLink::configuration() {
-
-    if( !_configuration ) {
-      CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&_configuration) )
-                    << "Could not obtain the IDeckLinkConfiguration interface";
-      CHECK(_configuration != nullptr );
-    }
-
-    return _configuration;
-  }
+  // IDeckLinkConfiguration *DeckLink::configuration() {
+  //
+  //   if( !_configuration ) {
+  //     CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&_configuration) )
+  //                   << "Could not obtain the IDeckLinkConfiguration interface";
+  //     CHECK(_configuration != nullptr );
+  //   }
+  //
+  //   return _configuration;
+  // }
 
   //=================================================================
   // Configuration functions
@@ -183,14 +183,9 @@ namespace libblackmagic {
     LOG(INFO) << "In inputFormatChanged with mode " << displayModeToString( newMode );
 
     // Change output mode
-    _outputHandler->stopStreams();
+    _outputHandler->stopStreamsWait();
 
-    {
-      std::unique_lock<std::mutex> lock( _outputHandler->_scheduledPlaybackStoppedMutex );
-      _outputHandler->_scheduledPlaybackStoppedCond.wait(lock);
-    }
-
-    _outputHandler->disableOutput();
+    _outputHandler->disable();
     _outputHandler->enable( newMode );
 
     LOG(INFO) << "Restarting streams";

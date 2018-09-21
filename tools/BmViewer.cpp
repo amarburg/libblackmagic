@@ -187,10 +187,19 @@ int main( int argc, char** argv )
 		return 0;
 	}
 
-	//  Input should always auto-detect
-	deckLink.input().config().setMode( bmdModeDetect );
-	deckLink.input().config().set3D( do3D );
-		/* code */
+	BMDDisplayMode mode = stringToDisplayMode( desiredModeString );
+	if( mode == bmdModeUnknown ) {
+		LOG(WARNING) << "Didn't understand mode \"" << desiredModeString << "\"";
+		return -1;
+	} else if ( mode == bmdModeDetect ) {
+		LOG(WARNING) << "Card will attempt automatic detection, starting in HD1080p2997 mode";
+		mode = bmdModeHD1080p2997;
+	} else {
+		LOG(WARNING) << "Setting mode " << desiredModeString;
+	}
+
+	deckLink.input().enable( mode, true, do3D );
+	deckLink.output().enable( mode );
 
 	// Need to wait for initialization
 //	if( decklink.initializedSync.wait_for( std::chrono::seconds(1) ) == false || !decklink.initialized() ) {
@@ -212,16 +221,6 @@ int main( int argc, char** argv )
 
 		if ( doConfigCamera ) {
 			LOG(INFO) << "Sending configuration to cameras";
-
-			BMDDisplayMode mode = stringToDisplayMode( desiredModeString );
-			if( mode == bmdModeUnknown ) {
-				LOG(WARNING) << "Didn't understand mode \"" << desiredModeString << "\"";
-				return -1;
-			} else if ( mode == bmdModeDetect ) {
-				LOG(WARNING) << "Will attempt input format detection";
-			} else {
-				LOG(WARNING) << "Setting mode " << desiredModeString;
-			}
 
 			// Be careful not to exceed 255 byte buffer length
 			SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );

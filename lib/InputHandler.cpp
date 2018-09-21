@@ -12,12 +12,12 @@ namespace libblackmagic {
 
   const int maxDequeDepth = 10;
 
-  InputHandler::InputHandler( DeckLink &owner )
-    :  _frameCount(0),
-    _config(),
+  InputHandler::InputHandler( DeckLink &parent )
+    :  _frameCount(0), _noInputCount(0),
+     _currentConfig(),
     _enabled( false ),
-    _owner( owner ),
-    _deckLink( _owner.deckLink() ),
+    _parent( parent ),
+    _deckLink( _parent.deckLink() ),
     _deckLinkInput(  nullptr ),
     _deckLinkOutput( nullptr ),
     _grabbedImages(),
@@ -64,11 +64,7 @@ namespace libblackmagic {
 
   //== ===  ===
 
-  bool InputHandler::enable( void ) {
-    return enableInput();
-  }
-
-bool InputHandler::enableInput() {
+bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 
     // Hardcode some parameters for now
     BMDVideoInputFlags inputFlags = bmdVideoInputFlagDefault;
@@ -84,9 +80,7 @@ bool InputHandler::enableInput() {
       return false;
     }
 
-    BMDDisplayMode targetMode = _config.mode();
-
-    if( targetMode == bmdModeDetect ) {
+    if( doAuto ) {
       LOG(INFO) << "Automatic mode detection requested, checking for support";
 
       // Check for various desired features
@@ -98,12 +92,10 @@ bool InputHandler::enableInput() {
       } else {
         LOG(INFO) << "* Enabling automatic format detection on input card.";
         inputFlags |= bmdVideoInputEnableFormatDetection;
-        targetMode = bmdModeHD1080p2997; // Stand-in mode while waiting for mode detection
       }
-
     }
 
-    if( _config.do3D() ) {
+    if( do3D ) {
       inputFlags |= bmdVideoInputDualStream3D;
     }
 
@@ -112,7 +104,7 @@ bool InputHandler::enableInput() {
 
     // WHy iterate?  Just ask!
     BMDDisplayModeSupport displayModeSupported;
-    result = deckLinkInput()->DoesSupportVideoMode(targetMode,
+    result = deckLinkInput()->DoesSupportVideoMode(mode,
                                                     pixelFormat,
                                                     inputFlags,
                                                     &displayModeSupported,
@@ -148,8 +140,8 @@ bool InputHandler::enableInput() {
     LOG(INFO) << "DeckLinkInput complete!";
 
     // Update config with values
-    _config.setMode( displayMode->GetDisplayMode() );
-    //_config.set3D( displayMode->GetFlags() & bmdDetectedVideoInputDualStream3D );
+    _currentConfig.setMode( displayMode->GetDisplayMode() );
+    _currentConfig.set3D( displayMode->GetFlags() & bmdDetectedVideoInputDualStream3D );
 
     displayMode->Release();
 
@@ -169,9 +161,6 @@ bool InputHandler::enableInput() {
       LOG(WARNING) << "Failed to start input streams";
       return false;
     }
-
-    LOG(INFO) << "     ... done";
-
     return true;
   }
 
@@ -183,7 +172,6 @@ bool InputHandler::stopStreams() {
     LOG(WARNING) << "Failed to stop input streams";
     return false;
   }
-  LOG(INFO) << "    ...done";
 
   return true;
 }
@@ -195,7 +183,7 @@ int InputHandler::grab( void ) {
 
   // TODO.  Go back and check how many copies are being made...
   _grabbedImages[0] = cv::Mat();
-  int numImages = config().do3D() ? 2 : 1;
+  int numImages = _currentConfig.do3D() ? 2 : 1;
 
   for( auto i = 0; i < numImages; ++i ) {
     // If there was nothing in the queue, wait
@@ -253,6 +241,8 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
       LOG(WARNING) << "(" << std::this_thread::get_id()
                           << ") Frame received (" << _frameCount
                           << ") - No input signal detected";
+
+      ++_noInputCount;
     }
     else
     {
@@ -309,13 +299,12 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
 
 // Callback if bmdVideoInputEnableFormatDetection was set when
 // enabling video input
-HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents events,
-                                                IDeckLinkDisplayMode *mode,
-                                                BMDDetectedVideoInputFormatFlags formatFlags)
+  HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents events,
+                                              IDeckLinkDisplayMode *mode,
+                                              BMDDetectedVideoInputFormatFlags formatFlags)
   {
     LOG(INFO) << "(" << std::this_thread::get_id() << ") Received Video Input Format Changed";
 
-    HRESULT result;
     char*   displayModeName = nullptr;
     BMDPixelFormat  pixelFormat = bmdFormat10BitYUV;
 
@@ -323,8 +312,8 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
 
     mode->GetName((const char**)&displayModeName);
     LOG(INFO) << "Input video format changed to " << displayModeName << " "
-                        << ((formatFlags & bmdDetectedVideoInputRGB444) ? "RGB" : "YUV")
-                        << ((formatFlags & bmdDetectedVideoInputDualStream3D) ? " with 3D" : " not 3D");
+    << ((formatFlags & bmdDetectedVideoInputRGB444) ? "RGB" : "YUV")
+    << ((formatFlags & bmdDetectedVideoInputDualStream3D) ? " with 3D" : " not 3D");
 
     if (displayModeName) free(displayModeName);
 
@@ -338,36 +327,37 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
 
     //deckLinkOutput()->PauseStreams();
 
-      BMDVideoInputFlags m_inputFlags = bmdVideoInputFlagDefault | bmdVideoInputEnableFormatDetection;
+    //BMDVideoInputFlags m_inputFlags = bmdVideoInputFlagDefault | bmdVideoInputEnableFormatDetection;
 
-      if( formatFlags & bmdDetectedVideoInputDualStream3D ) {
-      //if( config().do3D() ) {
-        LOG(INFO) << "Enabled 3D at new input format";
-        m_inputFlags |= bmdVideoInputDualStream3D;
-      }
+    // if( formatFlags & bmdDetectedVideoInputDualStream3D ) {
+    // //if( config().do3D() ) {
+    //   LOG(INFO) << "Enabled 3D at new input format";
+    //   m_inputFlags |= bmdVideoInputDualStream3D;
+    // }
 
-      LOG(INFO) << "Enabling input at new resolution";
-      result = deckLinkInput()->EnableVideoInput(mode->GetDisplayMode(), pixelFormat, m_inputFlags);
-      if (result != S_OK) {
-        LOG(WARNING) << "Failed to switch video mode";
-        return result;
-      }
+    LOG(INFO) << "Enabling input at new resolution";
+    enable( mode->GetDisplayMode(), true, formatFlags & bmdDetectedVideoInputDualStream3D );
+    // result = deckLinkInput()->EnableVideoInput(mode->GetDisplayMode(), pixelFormat, m_inputFlags);
+    // if (result != S_OK) {
+    //   LOG(WARNING) << "Failed to switch video mode";
+    //   return result;
+    // }
 
-      _queues[0].flush();
-      _queues[1].flush();
+    _queues[0].flush();
+    _queues[1].flush();
 
-      _config.setMode( mode->GetDisplayMode() );
-      _config.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
+    _currentConfig.setMode( mode->GetDisplayMode() );
+    _currentConfig.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
 
-      LOG(INFO) << "Enabling output at new mode";
+    LOG(INFO) << "Enabling output at new mode";
 
-      deckLinkInput()->FlushStreams();
-      deckLinkInput()->StartStreams();
+    deckLinkInput()->FlushStreams();
+    deckLinkInput()->StartStreams();
 
-      _owner.sendInputFormatChanged( mode->GetDisplayMode() );
+    _parent.sendInputFormatChanged( mode->GetDisplayMode() );
 
-      // And reconfigure output
-      LOG(INFO) << "Restarted streams at new mode " << displayModeToString( mode->GetDisplayMode() );
+    // And reconfigure output
+    LOG(INFO) << "Restarted streams at new mode " << displayModeToString( mode->GetDisplayMode() );
 
     return S_OK;
   }
@@ -376,10 +366,10 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
   //
   //
   //
-  bool InputHandler::process(  IDeckLinkVideoFrame *videoFrame, int input )
+  bool InputHandler::process( IDeckLinkVideoFrame *videoFrame, int input )
   {
 
-    std::string frameName( config().do3D() ? ((input==1) ? "[RIGHT]" : "[LEFT]") : "" );
+    std::string frameName( _currentConfig.do3D() ? ((input==1) ? "[RIGHT]" : "[LEFT]") : "" );
 
     LOG(DEBUG) << frameName << " Processing frame...";
 

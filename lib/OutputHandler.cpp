@@ -9,13 +9,13 @@
 
 namespace libblackmagic {
 
-	OutputHandler::OutputHandler( DeckLink &owner )
+	OutputHandler::OutputHandler( DeckLink &parent )
 			:  _scheduledPlaybackStoppedCond(),
 				_scheduledPlaybackStoppedMutex(),
-				_config( bmdModeHD1080p2997 ),								// Set a default
+				// _config( bmdModeHD1080p2997 ),								// Set a default
 				_enabled(false),
-				_owner( owner ),
-				_deckLink( owner.deckLink() ),
+				_parent( parent ),
+				_deckLink( parent.deckLink() ),
 				_deckLinkOutput( nullptr ),
 				_totalFramesScheduled(0),
 				_buffer( new SharedBMSDIBuffer() ),
@@ -84,7 +84,7 @@ namespace libblackmagic {
 	    return false;
 	  }
 
-		_config.setMode( displayMode->GetDisplayMode() );
+		// _config.setMode( displayMode->GetDisplayMode() );
 	  displayMode->Release();
 
 		_totalFramesScheduled = 0;
@@ -132,8 +132,20 @@ namespace libblackmagic {
 		return true;
 	}
 
+	bool OutputHandler::stopStreamsWait()
+	{
+		stopStreams();
 
-bool OutputHandler::disableOutput()
+		{
+			std::unique_lock<std::mutex> lock( _scheduledPlaybackStoppedMutex );
+			_scheduledPlaybackStoppedCond.wait(lock);
+		}
+
+		return true;
+	}
+
+
+bool OutputHandler::disable()
 {
 	LOG(DEBUG) << "Disabling DecklinkOutput";
 

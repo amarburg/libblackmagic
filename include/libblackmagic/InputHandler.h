@@ -30,12 +30,12 @@ namespace libblackmagic {
     virtual ~InputHandler();
 
     // Retrieve the current configuration
-    InputConfig &config() { return _config; }
-    void setConfig( const InputConfig &config ) { _config = config; }
+    // InputConfig &config() { return _config; }
+    // void setConfig( const InputConfig &config ) { _config = config; }
 
     // Attempts to configure the input stream.   If not called explicitly,
     // will be called automatically by startStreams()
-    bool enable( void );
+    bool enable( BMDDisplayMode mode = bmdModeHD1080p2997, bool doAuto = true, bool do3D = true );
 
     // Lazy initializers
     IDeckLinkInput *deckLinkInput();
@@ -68,10 +68,12 @@ namespace libblackmagic {
 		// 	{ return _buffer; }
 
 
+
+
   protected:
 
     // Break into two functions to reduce complexity
-    bool enableInput();
+    // bool enableInput();
     //bool enableOutput();
 
     // bool startOutput();
@@ -102,11 +104,12 @@ namespace libblackmagic {
     // int32_t _refCount;
 
     unsigned long _frameCount;
+    unsigned long _noInputCount;
 
-    InputConfig _config;
+    InputConfig _currentConfig;
     bool _enabled;
 
-    DeckLink &_owner;
+    DeckLink &_parent;
     IDeckLink *_deckLink;
 
     IDeckLinkInput *_deckLinkInput;

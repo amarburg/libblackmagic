@@ -18,18 +18,18 @@ namespace libblackmagic {
 	class OutputHandler: public IDeckLinkVideoOutputCallback
 	{
 	public:
-		OutputHandler( DeckLink &owner );
+		OutputHandler( DeckLink &parent );
 		virtual ~OutputHandler(void);
 
 		// Retrieve the current configuration
-    InputConfig &config() { return _config; }
-		void setConfig( const InputConfig &config ) { _config = config; }
+    // InputConfig &config() { return _config; }
+		// void setConfig( const InputConfig &config ) { _config = config; }
 
 		// Lazy initializer
 		IDeckLinkOutput *deckLinkOutput();
 
 		bool enable( BMDDisplayMode mode = bmdModeHD1080p2997 );
-		bool disableOutput();
+		bool disable();
 
 		//void setBMSDIBuffer( const std::shared_ptr<SharedBMBuffer> &buffer );
 
@@ -48,8 +48,9 @@ namespace libblackmagic {
 		ULONG STDMETHODCALLTYPE Release() { return 1; }
 
 		bool startStreams( void );
-		bool stopStreams( void );
 
+		bool stopStreams( void );
+		bool stopStreamsWait( void );
 
 		// Condition variables
 		std::condition_variable _scheduledPlaybackStoppedCond;
@@ -65,10 +66,10 @@ namespace libblackmagic {
 
 	private:
 
-		InputConfig _config;
+		//InputConfig _config;
 		bool _enabled;
 
-		DeckLink &_owner;
+		DeckLink &_parent;
 		IDeckLink *_deckLink;
 		IDeckLinkOutput *_deckLinkOutput;
 
