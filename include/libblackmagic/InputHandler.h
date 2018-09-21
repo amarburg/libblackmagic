@@ -1,6 +1,8 @@
 #pragma once
 
 //#include <queue>
+#include <condition_variable>
+#include <mutex>
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -59,7 +61,8 @@ namespace libblackmagic {
     //== IDeckLinkOutputCallback methods ==
     HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
     HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void);
-    std::condition_variable _schedulePlaybackStoppedCond;
+    std::condition_variable _scheduledPlaybackStoppedCond;
+    std::mutex _scheduledPlaybackStoppedMutex;
 
     const std::shared_ptr<SharedBMSDIBuffer> &sdiProtocolBuffer()
 			{ return _buffer; }

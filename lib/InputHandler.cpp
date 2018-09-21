@@ -11,7 +11,8 @@ namespace libblackmagic {
   const int maxDequeDepth = 10;
 
   InputHandler::InputHandler( IDeckLink *deckLink )
-    : _schedulePlaybackStoppedCond(),
+    : _scheduledPlaybackStoppedCond(),
+    _scheduledPlaybackStoppedMutex(),
     _frameCount(0),
     _config(),
     _enabled( false ),
@@ -191,7 +192,7 @@ bool InputHandler::setOutputMode( BMDDisplayMode ) {
   IDeckLinkDisplayMode *displayMode = nullptr;
 
   if( deckLinkOutput()->DoesSupportVideoMode( _config.mode(), 0, outputFlags, &support, &displayMode ) != S_OK) {
-    LOG(WARNING) << "Unable to find a query output modes";
+    LOG(WARNING) << "Unable to query output support for mode " << displayModeToString(_config.mode());
     return false;
   }
 
@@ -432,8 +433,13 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
       LOG(WARNING) << "Unable to stop scheduled output: " << std::hex << result;
     }
 
-    _schedulePlaybackStoppedCond.wait();
+    {
+      std::unique_lock<std::mutex> guard( _scheduledPlaybackStoppedMutex );
+      _scheduledPlaybackStoppedCond.wait( guard );
 
+    }
+
+    // LOG(INFO) << "Playback stopped, disabling video output";
     // result = deckLinkOutput()->DisableVideoOutput();
     // if( result != S_OK ) {
     //   LOG(WARNING) << "Unable to disable video output: " << std::hex << result;
@@ -620,7 +626,7 @@ bail:
 HRESULT	STDMETHODCALLTYPE InputHandler::ScheduledPlaybackHasStopped(void) {
   LOG(INFO) << "Scheduled playback has stopped!";
 
-  _schedulePlaybackStoppedCond.notify_all();
+  _scheduledPlaybackStoppedCond.notify_all();
 
   return S_OK;
 }
