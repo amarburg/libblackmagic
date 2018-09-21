@@ -11,7 +11,8 @@ namespace libblackmagic {
   const int maxDequeDepth = 10;
 
   InputHandler::InputHandler( IDeckLink *deckLink )
-    : _frameCount(0),
+    : _schedulePlaybackStoppedCond(),
+    _frameCount(0),
     _config(),
     _enabled( false ),
     _deckLink(deckLink),
@@ -166,7 +167,7 @@ bool InputHandler::enableOutput() {
 
     // Set the callback object to the DeckLink device's output interface
     //_outputHandler = new OutputHandler( _deckLinkOutput, displayMode );
-    result = _deckLinkOutput->SetScheduledFrameCompletionCallback( this );
+    auto result = _deckLinkOutput->SetScheduledFrameCompletionCallback( this );
     if(result != S_OK) {
       LOGF(WARNING, "Could not set callback - result = %08x\n", result);
       return false;
@@ -182,7 +183,7 @@ bool InputHandler::enableOutput() {
 
 }
 
-bool InputHnalder::setOutputMode( BMDDisplayMode ) {
+bool InputHandler::setOutputMode( BMDDisplayMode ) {
   BMDVideoOutputFlags outputFlags  = bmdVideoOutputVANC;
   HRESULT result;
 
@@ -418,13 +419,27 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
     if (formatFlags & bmdDetectedVideoInputRGB444) pixelFormat = bmdFormat10BitRGB;
 
     mode->GetName((const char**)&displayModeName);
-    LOG(INFO) << "Video format changed to " << displayModeName << " "
+    LOG(INFO) << "Input video format changed to " << displayModeName << " "
                         << ((formatFlags & bmdDetectedVideoInputRGB444) ? "RGB" : "YUV")
                         << ((formatFlags & bmdDetectedVideoInputDualStream3D) ? " with 3D" : " not 3D");
 
     if (displayModeName) free(displayModeName);
 
     deckLinkInput()->PauseStreams();
+
+    result = deckLinkOutput()->StopScheduledPlayback(0, nullptr, 0);
+    if( result != S_OK ) {
+      LOG(WARNING) << "Unable to stop scheduled output: " << std::hex << result;
+    }
+
+    _schedulePlaybackStoppedCond.wait();
+
+    // result = deckLinkOutput()->DisableVideoOutput();
+    // if( result != S_OK ) {
+    //   LOG(WARNING) << "Unable to disable video output: " << std::hex << result;
+    // }
+
+    //deckLinkOutput()->PauseStreams();
 
       BMDVideoInputFlags m_inputFlags = bmdVideoInputFlagDefault | bmdVideoInputEnableFormatDetection;
 
@@ -434,6 +449,7 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
         m_inputFlags |= bmdVideoInputDualStream3D;
       }
 
+      LOG(INFO) << "Enabling output at new resolution";
       result = deckLinkInput()->EnableVideoInput(mode->GetDisplayMode(), pixelFormat, m_inputFlags);
       if (result != S_OK) {
         LOG(WARNING) << "Failed to switch video mode";
@@ -446,17 +462,16 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
       _config.setMode( mode->GetDisplayMode() );
       _config.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
 
+      LOG(INFO) << "Enabling output at new mode";
+      setOutputMode( mode->GetDisplayMode() );
+
       deckLinkInput()->FlushStreams();
       deckLinkInput()->StartStreams();
+      deckLinkOutput()->StartScheduledPlayback(0, _timeScale, 1.0);
 
-
-
-      stopOutput();
-      setOutputMode( mode->GetDisplayMode() );
-      startOutput();
 
       // And reconfigure output
-
+      LOG(INFO) << "Restarted streams at new mode " << displayModeToString( mode->GetDisplayMode() );
 
     return S_OK;
   }
@@ -601,6 +616,14 @@ bail:
     return S_OK;
   }
 
+
+HRESULT	STDMETHODCALLTYPE InputHandler::ScheduledPlaybackHasStopped(void) {
+  LOG(INFO) << "Scheduled playback has stopped!";
+
+  _schedulePlaybackStoppedCond.notify_all();
+
+  return S_OK;
+}
 
 
 

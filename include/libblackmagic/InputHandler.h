@@ -58,7 +58,8 @@ namespace libblackmagic {
 
     //== IDeckLinkOutputCallback methods ==
     HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
-    HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void) {	return S_OK; }
+    HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void);
+    std::condition_variable _schedulePlaybackStoppedCond;
 
     const std::shared_ptr<SharedBMSDIBuffer> &sdiProtocolBuffer()
 			{ return _buffer; }
@@ -81,6 +82,10 @@ namespace libblackmagic {
     std::thread processInThread( IDeckLinkVideoFrame *frame, int input = 0 ) {
           return std::thread([=] { process(frame, input); });
       }
+
+
+    // Sub-functions for video outputFlags
+    bool setOutputMode( BMDDisplayMode );
 
 
     IDeckLinkMutableVideoFrame *blankFrame()
