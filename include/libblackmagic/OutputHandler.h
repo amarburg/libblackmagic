@@ -28,7 +28,8 @@ namespace libblackmagic {
 		// Lazy initializer
 		IDeckLinkOutput *deckLinkOutput();
 
-		bool enable( void );
+		bool enable( BMDDisplayMode mode = bmdModeHD1080p2997 );
+		bool disableOutput();
 
 		//void setBMSDIBuffer( const std::shared_ptr<SharedBMBuffer> &buffer );
 

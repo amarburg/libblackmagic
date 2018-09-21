@@ -42,7 +42,7 @@ namespace libblackmagic {
 		return _deckLinkOutput;
 	}
 
-	bool OutputHandler::enable()
+	bool OutputHandler::enable( BMDDisplayMode mode )
 	{
 
 	  BMDVideoOutputFlags outputFlags  = bmdVideoOutputVANC;
@@ -51,7 +51,7 @@ namespace libblackmagic {
 	  BMDDisplayModeSupport support;
 		IDeckLinkDisplayMode *displayMode = nullptr;
 
-	  if( deckLinkOutput()->DoesSupportVideoMode( _config.mode(), 0, outputFlags, &support, &displayMode ) != S_OK) {
+	  if( deckLinkOutput()->DoesSupportVideoMode( mode, 0, outputFlags, &support, &displayMode ) != S_OK) {
 	    LOG(WARNING) << "Unable to find a query output modes";
 	    return false;
 	  }
@@ -62,8 +62,8 @@ namespace libblackmagic {
 	  }
 
 	  // Enable video output
-		LOG(INFO) << "Enabled output with mode " << displayModeToString(_config.mode()) << " (0x" << std::hex <<  _config.mode() << ") and flags " << outputFlags;
- 		result = deckLinkOutput()->EnableVideoOutput(_config.mode(), outputFlags );
+		LOG(INFO) << "Enabled output with mode " << displayModeToString(mode) << " (0x" << std::hex <<  mode << ") and flags " << outputFlags;
+ 		result = deckLinkOutput()->EnableVideoOutput(mode, outputFlags );
 		if( result != S_OK ) {
 	    LOG(WARNING) << "Could not enable video output, result = " << std::hex << result;
 	    return false;
@@ -87,12 +87,14 @@ namespace libblackmagic {
 		_config.setMode( displayMode->GetDisplayMode() );
 	  displayMode->Release();
 
+		_totalFramesScheduled = 0;
 		scheduleFrame( blankFrame() );
 
 	  LOG(DEBUG) << "DeckLinkOutput initialized!";
 		_enabled = true;
 	  return true;
 	}
+
 
 
 	bool OutputHandler::startStreams() {
@@ -118,7 +120,8 @@ namespace libblackmagic {
 	bool OutputHandler::stopStreams()
 	{
 		LOG(DEBUG) << "Stopping DeckLinkOutput streams";
-		// // And stop after one frame
+
+		// And stop after one frame
 		BMDTimeValue actualStopTime;
 		HRESULT result = deckLinkOutput()->StopScheduledPlayback(0, &actualStopTime, _timeScale);
 		if(result != S_OK)
@@ -129,6 +132,19 @@ namespace libblackmagic {
 		return true;
 	}
 
+
+bool OutputHandler::disableOutput()
+{
+	LOG(DEBUG) << "Disabling DecklinkOutput";
+
+	HRESULT result = deckLinkOutput()->DisableVideoOutput();
+	if(result != S_OK)
+	{
+		LOG(WARNING) << "Could not disable output - result = " << std::hex << result;
+		return false;
+	}
+	return true;
+}
 
 
 	// Callbacks for sending out new frames

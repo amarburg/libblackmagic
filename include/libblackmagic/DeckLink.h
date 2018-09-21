@@ -29,7 +29,7 @@ namespace libblackmagic {
 
     // == Public API =========================
     void sendInputFormatChanged( BMDDisplayMode newMode ) {
-			_thread->send( std::bind(&DeckLink::inputFormatChangedImpl, this, newMode) );
+			_thread->send( std::bind(&DeckLink::inputFormatChanged, this, newMode) );
 	   }
 
     // Input and output will be created automatically with defaults unless these
@@ -61,7 +61,7 @@ namespace libblackmagic {
     IDeckLink *createDeckLink( int cardNo );
 
     // Responders to public API
-    void inputFormatChangedImpl( BMDDisplayMode newMode );
+    void inputFormatChanged( BMDDisplayMode newMode );
 
   private:
 

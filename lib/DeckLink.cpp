@@ -123,7 +123,7 @@ namespace libblackmagic {
     }
 
   IDeckLinkConfiguration *DeckLink::configuration() {
-    
+
     if( !_configuration ) {
       CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&_configuration) )
                     << "Could not obtain the IDeckLinkConfiguration interface";
@@ -178,11 +178,24 @@ namespace libblackmagic {
   }
 
   //== API functions =================================================
-  void DeckLink::inputFormatChangedImpl( BMDDisplayMode newMode )
+  void DeckLink::inputFormatChanged( BMDDisplayMode newMode )
   {
-    LOG(INFO) << "In inputFormatChangedImpl with mode " << displayModeToString( newMode );
+    LOG(INFO) << "In inputFormatChanged with mode " << displayModeToString( newMode );
 
     // Change output mode
+    _outputHandler->stopStreams();
+
+    {
+      std::unique_lock<std::mutex> lock( _outputHandler->_scheduledPlaybackStoppedMutex );
+      _outputHandler->_scheduledPlaybackStoppedCond.wait(lock);
+    }
+
+    _outputHandler->disableOutput();
+    _outputHandler->enable( newMode );
+
+    LOG(INFO) << "Restarting streams";
+
+    _outputHandler->startStreams();
   }
 
   //=================================================================
