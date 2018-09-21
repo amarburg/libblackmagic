@@ -10,23 +10,22 @@
 namespace libblackmagic {
 
   using std::string;
+  using namespace active_object;
 
   DeckLink::DeckLink( int cardNo )
-  :
-    _deckLink( createDeckLink( cardNo ) ),
-    // _deckLinkInput( nullptr ),
-    // _deckLinkOutput( nullptr ),
+  : _deckLink( createDeckLink( cardNo ) ),
+    _configuration( nullptr ),
     _inputHandler( nullptr  ),
-    //_outputHandler( nullptr ),
-    _configuration( nullptr )
+    _outputHandler( nullptr ),
+    _thread( Active::createActive() )
   {
     CHECK( _deckLink != nullptr );
 
-    _inputHandler = new InputHandler( _deckLink );
+    _inputHandler = new InputHandler( *this );
     CHECK( _inputHandler != nullptr );
 
-    // _outputHandler = new OutputHandler( _deckLink );
-    // CHECK( _outputHandler  != nullptr );
+    _outputHandler = new OutputHandler( *this );
+    CHECK( _outputHandler  != nullptr );
   }
 
   DeckLink::~DeckLink()
@@ -43,7 +42,7 @@ namespace libblackmagic {
     // }
 
     if( _inputHandler ) delete _inputHandler;
-    //if( _outputHandler) delete _outputHandler;
+    if( _outputHandler) delete _outputHandler;
 
     _deckLink->Release();
 
@@ -76,7 +75,7 @@ namespace libblackmagic {
 
   void DeckLink::listInputModes() {
 
-  IDeckLinkInput *input = nullptr;
+    IDeckLinkInput *input = nullptr;
 
     // Get the input (capture) interface of the DeckLink device
     auto result = _deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&input);
@@ -115,69 +114,24 @@ namespace libblackmagic {
       LOG(INFO) << "Card supports display mode \"" << displayModeName << "\"    "
                     << displayMode->GetWidth() << " x " << displayMode->GetHeight()
                     << ", " << 1.0/frameRate << " FPS"
-		    << ( (displayMode->GetFlags() & bmdDisplayModeSupports3D) ? " (3D)" : "" );;
+        << ( (displayMode->GetFlags() & bmdDisplayModeSupports3D) ? " (3D)" : "" );;
 
+    }
+
+    input->Release();
+
+    }
+
+  IDeckLinkConfiguration *DeckLink::configuration() {
+    
+    if( !_configuration ) {
+      CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&_configuration) )
+                    << "Could not obtain the IDeckLinkConfiguration interface";
+      CHECK(_configuration != nullptr );
+    }
+
+    return _configuration;
   }
-
-  input->Release();
-
-}
-
-IDeckLinkConfiguration *DeckLink::configuration() {
-  if( !_configuration ) {
-    CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&_configuration) )
-                  << "Could not obtain the IDeckLinkConfiguration interface";
-    CHECK(_configuration != nullptr );
-  }
-
-  return _configuration;
-}
-
-  //==== Lazy constructors ====
-  // IDeckLink *DeckLink::deckLink()
-  // {
-  //   if( !_deckLink ) createDeckLink();
-  //   CHECK( (bool)_deckLink ) << "Error creating Decklink card";
-  //   return _deckLink;
-  // }
-  //
-  // IDeckLinkInput *DeckLink::deckLinkInput()
-  // {
-  //   if( !_deckLinkInput && !initialize() ) {
-  //     LOG(FATAL) << "Error creating video input";
-  //     return NULL;
-  //   }
-  //   CHECK( (bool)_deckLinkInput ) << "_deckLinkInput not set";
-  //   return _deckLinkInput;
-  // }
-  //
-  // IDeckLinkOutput *DeckLink::deckLinkOutput()
-  // {
-  //   if( !_deckLinkOutput && !createVideoOutput() ) {
-  //     LOG(FATAL) << "Error creating video output";
-  //     return NULL;
-  //   }
-  //   CHECK( (bool)_deckLinkOutput ) << "_deckLinkOutput not set";
-  //   return _deckLinkOutput;
-  // }
-  //
-  // InputHandler &DeckLink::inputHandler()
-  // {
-  //   // InputHandler is created in parallel with deckLinkInput
-  //   if( !_inputHandler ) { deckLinkInput(); }
-  //   CHECK( (bool)_inputHandler ) << "_inputHandler not set";
-  //
-  //   return *_inputHandler;
-  // }
-  //
-  // OutputHandler &DeckLink::outputHandler()
-  // {
-  //   // OutputHandler is create in parallel with deckLinkOutput
-  //   if( !_outputHandler ) { deckLinkOutput(); }
-  //   CHECK( (bool)_outputHandler ) << "_outputHandler not set";
-  //
-  //   return *_outputHandler;
-  // }
 
   //=================================================================
   // Configuration functions
@@ -223,6 +177,13 @@ IDeckLinkConfiguration *DeckLink::configuration() {
    return deckLink;
   }
 
+  //== API functions =================================================
+  void DeckLink::inputFormatChangedImpl( BMDDisplayMode newMode )
+  {
+    LOG(INFO) << "In inputFormatChangedImpl with mode " << displayModeToString( newMode );
+
+    // Change output mode
+  }
 
   //=================================================================
 
@@ -230,7 +191,7 @@ IDeckLinkConfiguration *DeckLink::configuration() {
   {
 
     // TODO.  Check responses
-    //if( !_outputHandler->startStreams() ) return false;
+    if( !_outputHandler->startStreams() ) return false;
     if( !_inputHandler->startStreams() ) return false;;
 
     return true;
@@ -239,7 +200,7 @@ IDeckLinkConfiguration *DeckLink::configuration() {
   void DeckLink::stopStreams( void )
   {
     _inputHandler->stopStreams();
-    //_outputHandler->stopStreams();
+    _outputHandler->stopStreams();
 
   }
 

@@ -5,13 +5,17 @@
 
 #include "libblackmagic/SDICameraControl.h"
 #include "libblackmagic/OutputHandler.h"
+#include "libblackmagic/DeckLink.h"
 
 namespace libblackmagic {
 
-	OutputHandler::OutputHandler( IDeckLink *deckLink )
-			:  _config( bmdModeHD1080p2997 ),								// Set a default
+	OutputHandler::OutputHandler( DeckLink &owner )
+			:  _scheduledPlaybackStoppedCond(),
+				_scheduledPlaybackStoppedMutex(),
+				_config( bmdModeHD1080p2997 ),								// Set a default
 				_enabled(false),
-				_deckLink(deckLink),
+				_owner( owner ),
+				_deckLink( owner.deckLink() ),
 				_deckLinkOutput( nullptr ),
 				_totalFramesScheduled(0),
 				_buffer( new SharedBMSDIBuffer() ),
@@ -91,10 +95,41 @@ namespace libblackmagic {
 	}
 
 
-	void OutputHandler::inputFormatChanged( BMDDisplayMode newMode )
-	{
-		LOG(INFO) << "Input mode has changed to " << displayModeToString(newMode);
+	bool OutputHandler::startStreams() {
+			if( !_enabled && !enable() ) return false;
+
+		LOG(DEBUG) << "Starting DeckLinkOutput streams ...";
+
+		// // Pre-roll a few blank frames
+		// const int prerollFrames = 3;
+		// for( int i = 0; i < prerollFrames ; ++i ) {
+		// 	scheduleFrame(blankFrame());
+		// }
+
+		HRESULT result = _deckLinkOutput->StartScheduledPlayback(0, _timeScale, 1.0);
+		if(result != S_OK) {
+			LOG(WARNING) << "Could not start video output - result = " << std::hex << result;
+			return false;
+		}
+
+		return true;
 	}
+
+	bool OutputHandler::stopStreams()
+	{
+		LOG(DEBUG) << "Stopping DeckLinkOutput streams";
+		// // And stop after one frame
+		BMDTimeValue actualStopTime;
+		HRESULT result = deckLinkOutput()->StopScheduledPlayback(0, &actualStopTime, _timeScale);
+		if(result != S_OK)
+		{
+			LOG(WARNING) << "Could not stop video playback - result = " << std::hex << result;
+		}
+
+		return true;
+	}
+
+
 
 	// Callbacks for sending out new frames
 	void OutputHandler::scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats )
@@ -144,39 +179,13 @@ namespace libblackmagic {
 		return S_OK;
 	}
 
-bool OutputHandler::startStreams() {
-		if( !_enabled && !enable() ) return false;
+	HRESULT	STDMETHODCALLTYPE OutputHandler::ScheduledPlaybackHasStopped(void) {
+		LOG(INFO) << "Scheduled playback has stopped!";
 
-	LOG(DEBUG) << "Starting DeckLinkOutput streams ...";
+		_scheduledPlaybackStoppedCond.notify_all();
 
-	// // Pre-roll a few blank frames
-	// const int prerollFrames = 3;
-	// for( int i = 0; i < prerollFrames ; ++i ) {
-	// 	scheduleFrame(blankFrame());
-	// }
-
-	HRESULT result = _deckLinkOutput->StartScheduledPlayback(0, _timeScale, 1.0);
-	if(result != S_OK) {
-		LOG(WARNING) << "Could not start video output - result = " << std::hex << result;
-		return false;
+		return S_OK;
 	}
-
-	return true;
-}
-
-bool OutputHandler::stopStreams()
-{
-	LOG(DEBUG) << "Stopping DeckLinkOutput streams";
-	// // And stop after one frame
-	BMDTimeValue actualStopTime;
-	HRESULT result = deckLinkOutput()->StopScheduledPlayback(0, &actualStopTime, _timeScale);
-	if(result != S_OK)
-	{
-		LOG(WARNING) << "Could not stop video playback - result = " << std::hex << result;
-	}
-
-	return true;
-}
 
 
 }

@@ -4,11 +4,10 @@
 
 #include <DeckLinkAPI.h>
 
-#include "libbmsdi/bmsdi_message.h"
+#include "active_object/active.h"
 
 #include "InputHandler.h"
-#include "SDICameraControl.h"
-
+#include "OutputHandler.h"
 
 namespace libblackmagic {
 
@@ -28,6 +27,11 @@ namespace libblackmagic {
     DeckLink( const DeckLink & ) = delete;
     DeckLink &operator=( const DeckLink & ) = delete;
 
+    // == Public API =========================
+    void sendInputFormatChanged( BMDDisplayMode newMode ) {
+			_thread->send( std::bind(&DeckLink::inputFormatChangedImpl, this, newMode) );
+	   }
+
     // Input and output will be created automatically with defaults unless these
     // functions are called first.
     // bool  createVideoInput( const BMDDisplayMode desiredMode = bmdModeHD1080p2997 );
@@ -36,6 +40,7 @@ namespace libblackmagic {
     void listCards();
     void listInputModes();
 
+    IDeckLink *deckLink() { return _deckLink; }
     IDeckLinkConfiguration *configuration();
 
     // These start and stop the input streams
@@ -44,7 +49,7 @@ namespace libblackmagic {
 
     // Lazy constructors
     InputHandler &input()     { return *_inputHandler; }
-    //OutputHandler &output()   { return *_outputHandler; }
+    OutputHandler &output()   { return *_outputHandler; }
 
     // // Pull images from _InputHandler
     // virtual bool grab( void );
@@ -54,6 +59,9 @@ namespace libblackmagic {
   protected:
 
     IDeckLink *createDeckLink( int cardNo );
+
+    // Responders to public API
+    void inputFormatChangedImpl( BMDDisplayMode newMode );
 
   private:
 
@@ -66,8 +74,10 @@ namespace libblackmagic {
     // IDeckLinkInput *_deckLinkInput;
     // IDeckLinkOutput *_deckLinkOutput;
 
-    InputHandler *_inputHandler;
-    //OutputHandler *_outputHandler;
+    InputHandler  *_inputHandler;
+    OutputHandler *_outputHandler;
+
+    std::unique_ptr<active_object::Active> _thread;
 
   };
 

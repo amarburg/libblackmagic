@@ -21,12 +21,12 @@
 
 namespace libblackmagic {
 
+  class DeckLink;
 
-
-  class InputHandler : public IDeckLinkInputCallback, public IDeckLinkVideoOutputCallback
+  class InputHandler : public IDeckLinkInputCallback
   {
   public:
-    InputHandler( IDeckLink *deckLink );
+    InputHandler( DeckLink &deckLink );
     virtual ~InputHandler();
 
     // Retrieve the current configuration
@@ -45,7 +45,7 @@ namespace libblackmagic {
     virtual ULONG STDMETHODCALLTYPE AddRef(void);
     virtual ULONG STDMETHODCALLTYPE  Release(void);
 
-    //== IDeckLinkInputCallback methods ==
+    // //== IDeckLinkInputCallback methods ==
     virtual HRESULT STDMETHODCALLTYPE VideoInputFormatChanged(BMDVideoInputFormatChangedEvents, IDeckLinkDisplayMode*, BMDDetectedVideoInputFormatFlags);
     virtual HRESULT STDMETHODCALLTYPE VideoInputFrameArrived(IDeckLinkVideoInputFrame*, IDeckLinkAudioInputPacket*);
 
@@ -58,25 +58,25 @@ namespace libblackmagic {
     int getRawImage( int i, cv::Mat &mat );
 
 
-    //== IDeckLinkOutputCallback methods ==
-    HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
-    HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void);
-    std::condition_variable _scheduledPlaybackStoppedCond;
-    std::mutex _scheduledPlaybackStoppedMutex;
-
-    const std::shared_ptr<SharedBMSDIBuffer> &sdiProtocolBuffer()
-			{ return _buffer; }
+    // //== IDeckLinkOutputCallback methods ==
+    // HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
+    // HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void);
+    // std::condition_variable _scheduledPlaybackStoppedCond;
+    // std::mutex _scheduledPlaybackStoppedMutex;
+    //
+    // const std::shared_ptr<SharedBMSDIBuffer> &sdiProtocolBuffer()
+		// 	{ return _buffer; }
 
 
   protected:
 
     // Break into two functions to reduce complexity
     bool enableInput();
-    bool enableOutput();
+    //bool enableOutput();
 
-    bool startOutput();
-
-    bool stopOutput();
+    // bool startOutput();
+    //
+    // bool stopOutput();
 
 
     // Process input frames
@@ -88,13 +88,13 @@ namespace libblackmagic {
 
 
     // Sub-functions for video outputFlags
-    bool setOutputMode( BMDDisplayMode );
+    //bool setOutputMode( BMDDisplayMode );
 
 
-    IDeckLinkMutableVideoFrame *blankFrame()
-			{		if( !_blankFrame ) _blankFrame = makeBlueFrame(deckLinkOutput(), true ); return _blankFrame; }
-
-		void scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats = 1 );
+    // IDeckLinkMutableVideoFrame *blankFrame()
+		// 	{		if( !_blankFrame ) _blankFrame = makeBlueFrame(deckLinkOutput(), true ); return _blankFrame; }
+    //
+		// void scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats = 1 );
 
   private:
 
@@ -106,7 +106,9 @@ namespace libblackmagic {
     InputConfig _config;
     bool _enabled;
 
+    DeckLink &_owner;
     IDeckLink *_deckLink;
+
     IDeckLinkInput *_deckLinkInput;
     IDeckLinkOutput *_deckLinkOutput;
 
@@ -114,18 +116,18 @@ namespace libblackmagic {
     std::array<cv::Mat,2> _grabbedImages;
     std::array<active_object::shared_queue< cv::Mat >,2> _queues;
 
-    //== output-related member variables ==
-
-		// Cached values
-		BMDTimeValue _frameDuration;
-		BMDTimeScale _timeScale;
-
-		//BMSDIBuffer *_bmsdiBuffer;
-
-		unsigned int _totalFramesScheduled;
-
-		std::shared_ptr<SharedBMSDIBuffer> _buffer;
-		IDeckLinkMutableVideoFrame *_blankFrame;
+    // //== output-related member variables ==
+    //
+		// // Cached values
+		// BMDTimeValue _frameDuration;
+		// BMDTimeScale _timeScale;
+    //
+		// //BMSDIBuffer *_bmsdiBuffer;
+    //
+		// unsigned int _totalFramesScheduled;
+    //
+		// std::shared_ptr<SharedBMSDIBuffer> _buffer;
+		// IDeckLinkMutableVideoFrame *_blankFrame;
   };
 
 }

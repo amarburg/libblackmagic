@@ -13,16 +13,17 @@
 
 namespace libblackmagic {
 
+	class DeckLink;
+
 	class OutputHandler: public IDeckLinkVideoOutputCallback
 	{
 	public:
-		OutputHandler( IDeckLink *deckLink );
+		OutputHandler( DeckLink &owner );
 		virtual ~OutputHandler(void);
 
 		// Retrieve the current configuration
     InputConfig &config() { return _config; }
 		void setConfig( const InputConfig &config ) { _config = config; }
-
 
 		// Lazy initializer
 		IDeckLinkOutput *deckLinkOutput();
@@ -37,7 +38,8 @@ namespace libblackmagic {
 		void inputFormatChanged( BMDDisplayMode mode );
 
 		HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
-		HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void) {	return S_OK; }
+		HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void);
+
 
 		// Dummy implementations
 		HRESULT	STDMETHODCALLTYPE QueryInterface (REFIID iid, LPVOID *ppv){ return E_NOINTERFACE; }
@@ -46,6 +48,11 @@ namespace libblackmagic {
 
 		bool startStreams( void );
 		bool stopStreams( void );
+
+
+		// Condition variables
+		std::condition_variable _scheduledPlaybackStoppedCond;
+		std::mutex _scheduledPlaybackStoppedMutex;
 
 	protected:
 
@@ -60,6 +67,7 @@ namespace libblackmagic {
 		InputConfig _config;
 		bool _enabled;
 
+		DeckLink &_owner;
 		IDeckLink *_deckLink;
 		IDeckLinkOutput *_deckLinkOutput;
 

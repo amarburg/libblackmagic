@@ -6,26 +6,27 @@
 
 #include "libblackmagic/InputHandler.h"
 
+#include "libblackmagic/DeckLink.h"
+
 namespace libblackmagic {
 
   const int maxDequeDepth = 10;
 
-  InputHandler::InputHandler( IDeckLink *deckLink )
-    : _scheduledPlaybackStoppedCond(),
-    _scheduledPlaybackStoppedMutex(),
-    _frameCount(0),
+  InputHandler::InputHandler( DeckLink &owner )
+    :  _frameCount(0),
     _config(),
     _enabled( false ),
-    _deckLink(deckLink),
+    _owner( owner ),
+    _deckLink( _owner.deckLink() ),
     _deckLinkInput(  nullptr ),
     _deckLinkOutput( nullptr ),
     _grabbedImages(),
-    _queues(),
-    _totalFramesScheduled(0),
-    _buffer( new SharedBMSDIBuffer() ),
-    _blankFrame( nullptr )
+    _queues()
   {
-    deckLink->AddRef(); }
+    _deckLink->AddRef();
+
+
+  }
 
   InputHandler::~InputHandler() {
     if( _deckLinkInput ) _deckLinkInput->Release();
@@ -64,11 +65,8 @@ namespace libblackmagic {
   //== ===  ===
 
   bool InputHandler::enable( void ) {
-
-    if( !enableInput() ) return false;
-    return enableOutput();
-
-}
+    return enableInput();
+  }
 
 bool InputHandler::enableInput() {
 
@@ -160,69 +158,9 @@ bool InputHandler::enableInput() {
     }
 
 
-bool InputHandler::enableOutput() {
-
-    setOutputMode( _config.mode() );
-
-    //LOG(INFO) << "Time value " << _timeValue << " ; " << _timeScale;
-
-    // Set the callback object to the DeckLink device's output interface
-    //_outputHandler = new OutputHandler( _deckLinkOutput, displayMode );
-    auto result = _deckLinkOutput->SetScheduledFrameCompletionCallback( this );
-    if(result != S_OK) {
-      LOGF(WARNING, "Could not set callback - result = %08x\n", result);
-      return false;
-    }
-
-    // _config.setMode( displayMode->GetDisplayMode() );
-
-    scheduleFrame( blankFrame() );
-
-    LOG(DEBUG) << "DeckLinkOutput initialized!";
-    _enabled = true;
-    return true;
-
-}
-
-bool InputHandler::setOutputMode( BMDDisplayMode ) {
-  BMDVideoOutputFlags outputFlags  = bmdVideoOutputVANC;
-  HRESULT result;
-
-  BMDDisplayModeSupport support;
-  IDeckLinkDisplayMode *displayMode = nullptr;
-
-  if( deckLinkOutput()->DoesSupportVideoMode( _config.mode(), 0, outputFlags, &support, &displayMode ) != S_OK) {
-    LOG(WARNING) << "Unable to query output support for mode " << displayModeToString(_config.mode());
-    return false;
-  }
-
-  if( support == bmdDisplayModeNotSupported ) {
-    LOG(WARNING) << "Display mode not supported";
-    return false;
-  }
-
-  // Enable video output
-  LOG(INFO) << "Enabled output with mode " << displayModeToString(_config.mode()) << " (0x" << std::hex <<  _config.mode() << ") and flags " << outputFlags;
-  result = deckLinkOutput()->EnableVideoOutput(_config.mode(), outputFlags );
-  if( result != S_OK ) {
-    LOG(WARNING) << "Could not enable video output, result = " << std::hex << result;
-    return false;
-  }
-
-  if( S_OK != displayMode->GetFrameRate( &_frameDuration, &_timeScale ) ) {
-    LOG(WARNING) << "Unable to get time rate information for output...";
-    return false;
-  }
-
-  displayMode->Release();
-
-}
-
 //-------
   bool InputHandler::startStreams() {
     if( !_enabled && !enable() ) return false;
-
-    startOutput();
 
     LOG(INFO) << "Starting DeckLink input streams ....";
 
@@ -238,53 +176,17 @@ bool InputHandler::setOutputMode( BMDDisplayMode ) {
   }
 
 
-bool InputHandler::startOutput() {
-  if( !_enabled && !enable() ) return false;
-
-  LOG(DEBUG) << "Starting DeckLink output streams ...";
-
-  // // Pre-roll a few blank frames
-  // const int prerollFrames = 3;
-  // for( int i = 0; i < prerollFrames ; ++i ) {
-  // 	scheduleFrame(blankFrame());
-  // }
-
-  HRESULT result = _deckLinkOutput->StartScheduledPlayback(0, _timeScale, 1.0);
-  if(result != S_OK) {
-    LOG(WARNING) << "Could not start video output - result = " << std::hex << result;
-    return false;
-  }
-
-  return true;
-}
-
-
 //-------
 bool InputHandler::stopStreams() {
   LOG(INFO) << " Stopping DeckLinkInput streams";
   if (deckLinkInput()->StopStreams() != S_OK) {
     LOG(WARNING) << "Failed to stop input streams";
+    return false;
   }
   LOG(INFO) << "    ...done";
 
-  return stopOutput();
+  return true;
 }
-
-
-bool InputHandler::stopOutput()
-{
-	LOG(DEBUG) << "Stopping DeckLinkOutput streams";
-	// // And stop after one frame
-	BMDTimeValue actualStopTime;
-	HRESULT result = deckLinkOutput()->StopScheduledPlayback(0, &actualStopTime, _timeScale);
-	if(result != S_OK)
-	{
-		LOG(WARNING) << "Could not stop video playback - result = " << std::hex << result;
-	}
-
-	return true;
-}
-
 
 
 //-------
@@ -428,17 +330,6 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
 
     deckLinkInput()->PauseStreams();
 
-    result = deckLinkOutput()->StopScheduledPlayback(0, nullptr, 0);
-    if( result != S_OK ) {
-      LOG(WARNING) << "Unable to stop scheduled output: " << std::hex << result;
-    }
-
-    {
-      std::unique_lock<std::mutex> guard( _scheduledPlaybackStoppedMutex );
-      _scheduledPlaybackStoppedCond.wait( guard );
-
-    }
-
     // LOG(INFO) << "Playback stopped, disabling video output";
     // result = deckLinkOutput()->DisableVideoOutput();
     // if( result != S_OK ) {
@@ -455,7 +346,7 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
         m_inputFlags |= bmdVideoInputDualStream3D;
       }
 
-      LOG(INFO) << "Enabling output at new resolution";
+      LOG(INFO) << "Enabling input at new resolution";
       result = deckLinkInput()->EnableVideoInput(mode->GetDisplayMode(), pixelFormat, m_inputFlags);
       if (result != S_OK) {
         LOG(WARNING) << "Failed to switch video mode";
@@ -469,12 +360,11 @@ HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents e
       _config.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
 
       LOG(INFO) << "Enabling output at new mode";
-      setOutputMode( mode->GetDisplayMode() );
 
       deckLinkInput()->FlushStreams();
       deckLinkInput()->StartStreams();
-      deckLinkOutput()->StartScheduledPlayback(0, _timeScale, 1.0);
 
+      _owner.sendInputFormatChanged( mode->GetDisplayMode() );
 
       // And reconfigure output
       LOG(INFO) << "Restarted streams at new mode " << displayModeToString( mode->GetDisplayMode() );
@@ -570,70 +460,6 @@ bail:
     return false;
 
   }
-
-
-
-  //==== Output callbacks ======
-  // Callbacks for sending out new frames
-  void InputHandler::scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats )
-  {
-    LOG(DEBUG) << "Scheduling frame " << _totalFramesScheduled;
-    deckLinkOutput()->ScheduleVideoFrame(frame, _totalFramesScheduled*_frameDuration,  _frameDuration*numRepeats, _timeScale );
-    //deckLinkOutput()->ScheduleVideoFrame(frame, _totalFramesScheduled*_timeValue,  1, _timeScale );
-    _totalFramesScheduled += numRepeats;
-  }
-
-  HRESULT	STDMETHODCALLTYPE InputHandler::ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result)
-  {
-    BMDTimeValue frameCompletionTime = 0;
-    CHECK( deckLinkOutput()->GetFrameCompletionReferenceTimestamp( completedFrame, _timeScale, &frameCompletionTime ) == S_OK);
-
-    BMDTimeValue streamTime = 0;
-    double playbackSpeed = 0;
-    auto res = deckLinkOutput()->GetScheduledStreamTime(_timeScale, &streamTime, &playbackSpeed);
-
-
-    LOG(DEBUG) << "Completed a frame at " << frameCompletionTime << " with result " << result << " ; " << res << " " << streamTime << " " << playbackSpeed;
-    if( completedFrame != _blankFrame ) {
-      LOG(DEBUG) << "Completed frame != _blankFrame";
-      completedFrame->Release();
-    }
-
-    HRESULT r;
-
-    _buffer->getReadLock();
-    if( _buffer->buffer->len > 0 ) {
-      LOG(INFO) << "Scheduling frame with " << int(_buffer->buffer->len) << " bytes of BM SDI Commands";
-      r = deckLinkOutput()->ScheduleVideoFrame( makeFrameWithSDIProtocol( _deckLinkOutput, _buffer->buffer, true ),
-                                            streamTime, _frameDuration, _timeScale );
-      //scheduleFrame( addSDIProtocolToFrame( _deckLinkOutput, _blankFrame, _buffer->buffer ) );
-      bmResetBuffer( _buffer->buffer );
-    } else {
-      // Otherwise schedule a blank frame
-      r = deckLinkOutput()->ScheduleVideoFrame( blankFrame(),
-                                                streamTime, _frameDuration, _timeScale );
-    }
-    _buffer->releaseReadLock();
-
-    LOG_IF(WARNING, r != S_OK ) << "Scheduling not OK! " << result;
-
-    // Can I release the completeFrame?
-
-    return S_OK;
-  }
-
-
-HRESULT	STDMETHODCALLTYPE InputHandler::ScheduledPlaybackHasStopped(void) {
-  LOG(INFO) << "Scheduled playback has stopped!";
-
-  _scheduledPlaybackStoppedCond.notify_all();
-
-  return S_OK;
-}
-
-
-
-
 
 
 }
