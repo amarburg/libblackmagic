@@ -183,7 +183,9 @@ int InputHandler::grab( void ) {
 
   // TODO.  Go back and check how many copies are being made...
   _grabbedImages[0] = cv::Mat();
-  int numImages = _currentConfig.do3D() ? 2 : 1;
+  _grabbedImages[1] = cv::Mat();
+  
+  const int numImages = _currentConfig.do3D() ? 2 : 1;
 
   for( auto i = 0; i < numImages; ++i ) {
     // If there was nothing in the queue, wait
@@ -423,9 +425,9 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
           LOG(WARNING) << frameName << " Unable to get bytes from dstFrame";
           goto bail;
         }
-        cv::Mat srcMat( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
+
+        out = cv::Mat( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
         //cv::cvtColor(srcMat, out, cv::COLOR_BGRA2BGR);
-        cv::resize( srcMat, out, cv::Size(), 0.25, 0.25  );
 
         dstFrame->Release();
       }

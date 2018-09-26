@@ -3,6 +3,7 @@
 
 #include <DeckLinkAPIVersion.h>
 
+#include "g3log/loglevels.hpp"
 #include "libg3logger/g3logger.h"
 
 #include "libblackmagic/DeckLink.h"
@@ -137,7 +138,7 @@ namespace libblackmagic {
   // Configuration functions
   IDeckLink *DeckLink::createDeckLink( int cardNo )
   {
-    LOG(INFO) << "Using Decklink API  " << BLACKMAGIC_DECKLINK_API_VERSION_STRING;
+    //LOG(INFO) << "Using Decklink API  " << BLACKMAGIC_DECKLINK_API_VERSION_STRING;
     //
     // if( _deckLink ) {
     //   _deckLink->Release();
@@ -169,7 +170,7 @@ namespace libblackmagic {
       LOG(WARNING) << "Unable to query display name.";
     }
 
-    LOG(INFO) << "Using card " << cardNo << " model name: " << modelName << "; display name: " << displayName;
+    //LOG(INFO) << "Using card " << cardNo << " model name: " << modelName << "; display name: " << displayName;
 
     free(modelName);
     free(displayName);

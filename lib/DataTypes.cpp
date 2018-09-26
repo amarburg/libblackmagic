@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iostream>
+using namespace std;
 
 #include <libg3logger/g3logger.h>
 
@@ -56,7 +57,8 @@ namespace libblackmagic {
 
   ModeParams ModeParamsTable[] = {
     { bmdModeHD1080p2997, 1920, 1080, 29.97 },
-    { bmdModeHD1080p30,   1920, 1080, 30.0 }
+    { bmdModeHD1080p30,   1920, 1080, 30.0 },
+    { bmdModeHD1080p6000, 1920, 1080, 60.0 }
   };
 
   ModeParams modeParams( BMDDisplayMode mode )
@@ -65,6 +67,7 @@ namespace libblackmagic {
       if( mode == ModeParamsTable[i].mode ) return ModeParamsTable[i];
     }
 
+    cerr << "Unable to find mode " << mode << endl;
     return ModeParams( bmdModeUnknown, 0, 0, 0.0 );
   }
 
