@@ -14,7 +14,7 @@
 #include "ThreadSynchronizer.h"
 
 #include "DataTypes.h"
-#include "InputConfig.h"
+#include "ModeConfig.h"
 
 #include "SDICameraControl.h"
 #include "SDIMessageBuffer.h"
@@ -30,8 +30,8 @@ namespace libblackmagic {
     virtual ~InputHandler();
 
     // Retrieve the current configuration
-    // InputConfig &config() { return _config; }
-    // void setConfig( const InputConfig &config ) { _config = config; }
+    // ModeConfig &config() { return _config; }
+    // void setConfig( const ModeConfig &config ) { _config = config; }
 
     // Attempts to configure the input stream.   If not called explicitly,
     // will be called automatically by startStreams()
@@ -56,6 +56,8 @@ namespace libblackmagic {
 
     int grab( void );
     int getRawImage( int i, cv::Mat &mat );
+
+    ModeConfig currentConfig() const { return _currentConfig; }
 
 
     // //== IDeckLinkOutputCallback methods ==
@@ -106,7 +108,7 @@ namespace libblackmagic {
     unsigned long _frameCount;
     unsigned long _noInputCount;
 
-    InputConfig _currentConfig;
+    ModeConfig _currentConfig;
     bool _enabled;
 
     DeckLink &_parent;

@@ -192,7 +192,7 @@ int main( int argc, char** argv )
 		LOG(WARNING) << "Didn't understand mode \"" << desiredModeString << "\"";
 		return -1;
 	} else if ( mode == bmdModeDetect ) {
-		LOG(WARNING) << "Card will attempt automatic detection, starting in HD1080p2997 mode";
+		LOG(WARNING) << "Card will always attempt automatic detection, starting in HD1080p2997 mode";
 		mode = bmdModeHD1080p2997;
 	} else {
 		LOG(WARNING) << "Setting mode " << desiredModeString;

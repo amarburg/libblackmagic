@@ -28,6 +28,7 @@ namespace libblackmagic {
     {bmdModeDetect,        "DETECT"}
   };
 
+
   BMDDisplayMode stringToDisplayMode( const std::string &str )
   {
     std::string upcase;
@@ -49,5 +50,24 @@ namespace libblackmagic {
 
     return "(unknown)";
   }
+
+
+  //=== Mode parameters table ===
+
+  ModeParams ModeParamsTable[] = {
+    { bmdModeHD1080p2997, 1920, 1080, 29.97 },
+    { bmdModeHD1080p30,   1920, 1080, 30.0 }
+  };
+
+  ModeParams modeParams( BMDDisplayMode mode )
+  {
+    for( unsigned int i = 0; i < sizeof(ModeParamsTable)/sizeof(ModeParams); ++i ) {
+      if( mode == ModeParamsTable[i].mode ) return ModeParamsTable[i];
+    }
+
+    return ModeParams( bmdModeUnknown, 0, 0, 0.0 );
+  }
+
+
 
 };

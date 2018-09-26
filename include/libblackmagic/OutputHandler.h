@@ -7,8 +7,6 @@
 
 #include "SDICameraControl.h"
 
-#include "InputConfig.h"
-
 #include "SDIMessageBuffer.h"
 
 namespace libblackmagic {
@@ -66,7 +64,6 @@ namespace libblackmagic {
 
 	private:
 
-		//InputConfig _config;
 		bool _enabled;
 
 		DeckLink &_parent;
