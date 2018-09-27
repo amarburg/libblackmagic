@@ -21,7 +21,7 @@ namespace libblackmagic {
     _deckLinkInput(  nullptr ),
     _deckLinkOutput( nullptr ),
     _grabbedImages(),
-    _queues()
+    _queue()
   {
     _deckLink->AddRef();
 
@@ -181,23 +181,15 @@ bool InputHandler::stopStreams() {
 
 int InputHandler::grab( void ) {
 
-  // TODO.  Go back and check how many copies are being made...
-  _grabbedImages[0] = cv::Mat();
-  _grabbedImages[1] = cv::Mat();
-  
   const int numImages = _currentConfig.do3D() ? 2 : 1;
 
-  for( auto i = 0; i < numImages; ++i ) {
-    // If there was nothing in the queue, wait
-    if( _queues[i].wait_for_pop(_grabbedImages[i], std::chrono::milliseconds(100) ) == false ) {
-      LOG(WARNING) << "Timeout waiting for image queue " << i;
-      return 0;
-    }
-
+  // If there was nothing in the queue, wait
+  if( _queue.wait_for_pop(_grabbedImages, std::chrono::milliseconds(100) ) == false ) {
+    LOG(WARNING) << "Timeout waiting for image queue ";
+    return 0;
   }
 
   // Formerly checked for empty Mats here.  Still do that?
-
   return numImages;
 }
 
@@ -205,10 +197,10 @@ int InputHandler::getRawImage( int i, cv::Mat &mat ) {
 
   if( i == 0 || i == 1 ) {
     mat = _grabbedImages[i];
-    return 1;
+    return i;
   }
 
- return 0;
+ return -1;
 }
 
 // ImageSize InputHandler::imageSize( void ) const
@@ -222,7 +214,7 @@ int InputHandler::getRawImage( int i, cv::Mat &mat ) {
 // Callbacks are called in a private thread....
 HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFrame, IDeckLinkAudioInputPacket* audioFrame)
 {
-  IDeckLinkVideoFrame *rightEyeFrame = nullptr;
+
   IDeckLinkVideoFrame3DExtensions *threeDExtensions = nullptr;
 
   // Drop audio first thing
@@ -236,63 +228,74 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   }
 
   // Handle Video Frame
-  if (videoFrame) {
-
-    if (videoFrame->GetFlags() & bmdFrameHasNoInputSource)
-    {
-      LOG(WARNING) << "(" << std::this_thread::get_id()
-                          << ") Frame received (" << _frameCount
-                          << ") - No input signal detected";
-
-      ++_noInputCount;
-    }
-    else
-    {
-      // const char *timecodeString = nullptr;
-      // if (g_config.m_timecodeFormat != 0)
-      // {
-      //   IDeckLinkTimecode *timecode;
-      //   if (videoFrame->GetTimecode(g_config.m_timecodeFormat, &timecode) == S_OK)
-      //   {
-      //     timecode->GetString(&timecodeString);
-      //   }
-      // }
-
-      LOG(DEBUG) << "(" << std::this_thread::get_id()
-                  << ") Frame received (" << _frameCount
-                  << ") " << videoFrame->GetRowBytes() * videoFrame->GetHeight()
-                  << " bytes, " << videoFrame->GetWidth()
-                  << " x " << videoFrame->GetHeight();
-
-      // The AddRef will ensure the frame is valid after the end of the callback.
-      videoFrame->AddRef();
-      std::thread t = processInThread( videoFrame );
-      t.detach();
-
-      // If 3D mode is enabled we retreive the 3D extensions interface which gives.
-      // us access to the right eye frame by calling GetFrameForRightEye() .
-      if( videoFrame->QueryInterface(IID_IDeckLinkVideoFrame3DExtensions, (void **) &threeDExtensions) == S_OK ) {
-        if(threeDExtensions->GetFrameForRightEye(&rightEyeFrame) != S_OK) {
-          LOG(INFO) << "Error getting right eye frame";
-        }
-
-        LOG(DEBUG) << "(" << std::this_thread::get_id()
-                    << ") Right frame received (" << _frameCount
-                    << ") " << rightEyeFrame->GetRowBytes() * rightEyeFrame->GetHeight()
-                    << " bytes, " << rightEyeFrame->GetWidth()
-                    << " x " << rightEyeFrame->GetHeight();
-
-        // The AddRef will ensure the frame is valid after the end of the callback.
-        //rightEyeFrame->AddRef();
-        std::thread t = processInThread( rightEyeFrame, 1 );
-        t.detach();
-      }
-      if (threeDExtensions) threeDExtensions->Release();
-
-      _frameCount++;
-    }
+  if (!videoFrame) {
+    return E_FAIL;
   }
 
+  if (videoFrame->GetFlags() & bmdFrameHasNoInputSource)
+  {
+    LOG(WARNING) << "(" << std::this_thread::get_id()
+                        << ") Frame received (" << _frameCount
+                        << ") - No input signal detected";
+
+    ++_noInputCount;
+    return S_OK;
+  }
+
+
+    // const char *timecodeString = nullptr;
+    // if (g_config.m_timecodeFormat != 0)
+    // {
+    //   IDeckLinkTimecode *timecode;
+    //   if (videoFrame->GetTimecode(g_config.m_timecodeFormat, &timecode) == S_OK)
+    //   {
+    //     timecode->GetString(&timecodeString);
+    //   }
+    // }
+
+    LOG(DEBUG) << "(" << std::this_thread::get_id()
+                << ") Frame received (" << _frameCount
+                << ") " << videoFrame->GetRowBytes() * videoFrame->GetHeight()
+                << " bytes, " << videoFrame->GetWidth()
+                << " x " << videoFrame->GetHeight();
+
+    // The AddRef will ensure the frame is valid after the end of the callback.
+    FramePair framePair;
+
+    videoFrame->AddRef();
+    framePair[0] = videoFrame;
+
+    // If 3D mode is enabled we retreive the 3D extensions interface which gives.
+    // us access to the right eye frame by calling GetFrameForRightEye() .
+    if( videoFrame->QueryInterface(IID_IDeckLinkVideoFrame3DExtensions, (void **) &threeDExtensions) == S_OK ) {
+
+      IDeckLinkVideoFrame *rightEyeFrame = nullptr;
+
+      if(threeDExtensions->GetFrameForRightEye(&rightEyeFrame) != S_OK) {
+        LOG(INFO) << "Error getting right eye frame";
+      }
+
+      LOG(DEBUG) << "(" << std::this_thread::get_id()
+                  << ") Right frame received (" << _frameCount
+                  << ") " << rightEyeFrame->GetRowBytes() * rightEyeFrame->GetHeight()
+                  << " bytes, " << rightEyeFrame->GetWidth()
+                  << " x " << rightEyeFrame->GetHeight();
+
+      //rightEyeFrame->AddRef();
+      framePair[1] = rightEyeFrame;
+
+      // The AddRef will ensure the frame is valid after the end of the callback.
+      // std::thread t = processInThread( rightEyeFrame, 1 );
+      // t.detach();
+    }
+
+
+  std::thread t = processInThread( framePair );
+  t.detach();
+
+  if (threeDExtensions) threeDExtensions->Release();
+
+  _frameCount++;
 
   return S_OK;
 }
@@ -321,32 +324,10 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
 
     deckLinkInput()->PauseStreams();
 
-    // LOG(INFO) << "Playback stopped, disabling video output";
-    // result = deckLinkOutput()->DisableVideoOutput();
-    // if( result != S_OK ) {
-    //   LOG(WARNING) << "Unable to disable video output: " << std::hex << result;
-    // }
-
-    //deckLinkOutput()->PauseStreams();
-
-    //BMDVideoInputFlags m_inputFlags = bmdVideoInputFlagDefault | bmdVideoInputEnableFormatDetection;
-
-    // if( formatFlags & bmdDetectedVideoInputDualStream3D ) {
-    // //if( config().do3D() ) {
-    //   LOG(INFO) << "Enabled 3D at new input format";
-    //   m_inputFlags |= bmdVideoInputDualStream3D;
-    // }
-
     LOG(INFO) << "Enabling input at new resolution";
     enable( mode->GetDisplayMode(), true, formatFlags & bmdDetectedVideoInputDualStream3D );
-    // result = deckLinkInput()->EnableVideoInput(mode->GetDisplayMode(), pixelFormat, m_inputFlags);
-    // if (result != S_OK) {
-    //   LOG(WARNING) << "Failed to switch video mode";
-    //   return result;
-    // }
 
-    _queues[0].flush();
-    _queues[1].flush();
+    _queue.flush();
 
     _currentConfig.setMode( mode->GetDisplayMode() );
     _currentConfig.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
@@ -368,87 +349,98 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   //
   //
   //
-  bool InputHandler::process( IDeckLinkVideoFrame *videoFrame, int input )
+  bool InputHandler::process( FramePair framePair )
   {
+    std::array<cv::Mat,2> out;
 
-    std::string frameName( _currentConfig.do3D() ? ((input==1) ? "[RIGHT]" : "[LEFT]") : "" );
-
-    LOG(DEBUG) << frameName << " Processing frame...";
-
-    cv::Mat out;
-
-    switch (videoFrame->GetPixelFormat()) {
-      case bmdFormat8BitYUV:
-      {
-        void* data;
-        if ( videoFrame->GetBytes(&data) != S_OK ) goto bail;
-        cv::Mat mat = cv::Mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC2, data,
-        videoFrame->GetRowBytes());
-        cv::cvtColor(mat, out, cv::COLOR_YUV2BGR ); //_UYVY);
-        break;
-      }
-      case bmdFormat8BitBGRA:
-      {
-        void* data;
-        if ( videoFrame->GetBytes(&data) != S_OK ) goto bail;
-
-        cv::Mat mat = cv::Mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC4, data);
-        cv::cvtColor(mat, out, cv::COLOR_BGRA2BGR);
-        break;
-      }
-      default:
-      {
-        IDeckLinkMutableVideoFrame*     dstFrame = NULL;
-
-        //CvMatDeckLinkVideoFrame cvMatWrapper(videoFrame->GetHeight(), videoFrame->GetWidth());
-        LOG(DEBUG) << frameName << "Converting through Blackmagic VideoConversionInstance to " << videoFrame->GetWidth() << " x " << videoFrame->GetHeight();
-        HRESULT result = deckLinkOutput()->CreateVideoFrame( videoFrame->GetWidth(), videoFrame->GetHeight(),
-                                                            videoFrame->GetWidth() * 4, bmdFormat8BitBGRA, bmdFrameFlagDefault, &dstFrame);
-        if (result != S_OK)
-        {
-          LOG(WARNING) << frameName << " Failed to create destination video frame";
-          goto bail;
-        }
-
-        IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
-
-        //LOG(WARNING) << "Converting " << std::hex << videoFrame->GetPixelFormat() << " to " << dstFrame->GetPixelFormat();
-        result =  converter->ConvertFrame(videoFrame, dstFrame);
-
-        if (result != S_OK ) {
-          LOG(WARNING) << frameName << " Failed to do conversion " << std::hex << result;
-          goto bail;
-        }
-
-        void *buffer = nullptr;
-        if( dstFrame->GetBytes( &buffer ) != S_OK ) {
-          LOG(WARNING) << frameName << " Unable to get bytes from dstFrame";
-          goto bail;
-        }
-
-        out = cv::Mat( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
-        //cv::cvtColor(srcMat, out, cv::COLOR_BGRA2BGR);
-
-        dstFrame->Release();
-      }
-    }
-
-    LOG(DEBUG) << frameName << " Release; " << videoFrame->Release() << " references remain";
-
-    if( out.empty() ) {
-      LOG(WARNING) << frameName << " Frame is empty?";
+    // Make a working Buffer
+    IDeckLinkMutableVideoFrame*     dstFrame = NULL;
+    HRESULT result = deckLinkOutput()->CreateVideoFrame( framePair[0]->GetWidth(), framePair[0]->GetHeight(),  framePair[0]->GetWidth() * 4,
+                                                          bmdFormat8BitBGRA, bmdFrameFlagDefault, &dstFrame);
+    if (result != S_OK)
+    {
+      LOG(WARNING) << "Failed to create destination video frame";
       goto bail;
     }
 
-    while( _queues[input].size() >= maxDequeDepth && _queues[input].pop_and_drop()  ) {;}
-    _queues[input].push( out );
+    for( unsigned int i = 0; i < 2; i++ ) {
 
-    LOG(DEBUG) << frameName << " Push!" << " queue now " << _queues[input].size();
+      if( framePair[i] == nullptr ) continue;
+
+      IDeckLinkVideoFrame *videoFrame = framePair[i];
+
+      std::string frameName( _currentConfig.do3D() ? ((i==1) ? "[RIGHT]" : "[LEFT]") : "" );
+
+      LOG(DEBUG) << frameName << " Processing frame...";
+
+        switch (videoFrame->GetPixelFormat()) {
+        case bmdFormat8BitYUV:
+        {
+          void* data;
+          if ( videoFrame->GetBytes(&data) != S_OK ) goto bail;
+          cv::Mat mat = cv::Mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC2, data, videoFrame->GetRowBytes());
+          cv::cvtColor(mat, out[i], cv::COLOR_YUV2BGR ); //_UYVY);
+          break;
+        }
+        case bmdFormat8BitBGRA:
+        {
+          void* data;
+          if ( videoFrame->GetBytes(&data) != S_OK ) goto bail;
+
+          cv::Mat mat = cv::Mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC4, data);
+          cv::cvtColor(mat, out[i], cv::COLOR_BGRA2BGR);
+          break;
+        }
+        default:
+        {
+          //CvMatDeckLinkVideoFrame cvMatWrapper(videoFrame->GetHeight(), videoFrame->GetWidth());
+        //  LOG(DEBUG) << frameName << "Converting through Blackmagic VideoConversionInstance to " << videoFrame->GetWidth() << " x " << videoFrame->GetHeight();
+
+          IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
+
+          //LOG(WARNING) << "Converting " << std::hex << videoFrame->GetPixelFormat() << " to " << dstFrame->GetPixelFormat();
+          result =  converter->ConvertFrame(videoFrame, dstFrame);
+
+          if (result != S_OK ) {
+            LOG(WARNING) << frameName << " Failed to do conversion " << std::hex << result;
+            goto bail;
+          }
+
+          void *buffer = nullptr;
+          if( dstFrame->GetBytes( &buffer ) != S_OK ) {
+            LOG(WARNING) << frameName << " Unable to get bytes from dstFrame";
+            goto bail;
+          }
+
+           cv::Mat dst( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
+
+           dst.copyTo( out[i] );
+
+          //cv::cvtColor(srcMat, out[i], cv::COLOR_BGRA2BGR);
+
+        }
+      }
+
+
+      LOG(DEBUG) << frameName << " Release; " << videoFrame->Release() << " references remain";
+
+    }
+
+    dstFrame->Release();
+
+    while( _queue.size() >= maxDequeDepth && _queue.pop_and_drop() ) {;}
+    _queue.push( out );
+
+    LOG(DEBUG) << " Push!  queue now " << _queue.size();
     return true;
 
 
-bail:
-    videoFrame->Release();
+  bail:
+    if( framePair[1] ) framePair[1]->Release();
+    if( framePair[0] ) framePair[0]->Release();
+
+    dstFrame->Release();
+
     return false;
 
   }

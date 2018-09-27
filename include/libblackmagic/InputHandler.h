@@ -26,6 +26,13 @@ namespace libblackmagic {
   class InputHandler : public IDeckLinkInputCallback
   {
   public:
+
+    typedef std::array<cv::Mat,2> MatPair;
+    typedef std::array<IDeckLinkVideoFrame *,2> FramePair;
+
+
+
+
     InputHandler( DeckLink &deckLink );
     virtual ~InputHandler();
 
@@ -49,7 +56,7 @@ namespace libblackmagic {
     virtual HRESULT STDMETHODCALLTYPE VideoInputFormatChanged(BMDVideoInputFormatChangedEvents, IDeckLinkDisplayMode*, BMDDetectedVideoInputFormatFlags);
     virtual HRESULT STDMETHODCALLTYPE VideoInputFrameArrived(IDeckLinkVideoInputFrame*, IDeckLinkAudioInputPacket*);
 
-    active_object::shared_queue< cv::Mat > &queue( int i = 0 ) { return _queues[i]; }
+    active_object::shared_queue< MatPair > &queue() { return _queue; }
 
     bool startStreams();
     bool stopStreams();
@@ -84,10 +91,11 @@ namespace libblackmagic {
 
 
     // Process input frames
-    bool process( IDeckLinkVideoFrame *frame, int input = 0 );
 
-    std::thread processInThread( IDeckLinkVideoFrame *frame, int input = 0 ) {
-          return std::thread([=] { process(frame, input); });
+    bool process( FramePair frames );
+
+    std::thread processInThread( FramePair frames ) {
+          return std::thread([=] { process(frames); });
       }
 
 
@@ -118,8 +126,8 @@ namespace libblackmagic {
     IDeckLinkOutput *_deckLinkOutput;
 
     // == input member related variables ==
-    std::array<cv::Mat,2> _grabbedImages;
-    std::array<active_object::shared_queue< cv::Mat >,2> _queues;
+    MatPair _grabbedImages;
+    active_object::shared_queue< MatPair > _queue;
 
     // //== output-related member variables ==
     //
