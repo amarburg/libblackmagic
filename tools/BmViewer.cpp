@@ -219,25 +219,25 @@ int main( int argc, char** argv )
 	}
 
 
-		if ( doConfigCamera ) {
-			LOG(INFO) << "Sending configuration to cameras";
+	if ( doConfigCamera ) {
+		LOG(INFO) << "Sending configuration to cameras";
 
-			// Be careful not to exceed 255 byte buffer length
-			SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
-			guard( [mode]( BMSDIBuffer *buffer ) {
+		// Be careful not to exceed 255 byte buffer length
+		SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
+		guard( [mode]( BMSDIBuffer *buffer ) {
 
-				bmAddOrdinalAperture( buffer, CamNum, 0 );
-				bmAddSensorGain( buffer, CamNum, 8 );
-				bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
-				bmAddAutoWhiteBalance( buffer, CamNum );
+			bmAddOrdinalAperture( buffer, CamNum, 0 );
+			bmAddSensorGain( buffer, CamNum, 8 );
+			bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
+			bmAddAutoWhiteBalance( buffer, CamNum );
 
-				if(mode != bmdModeDetect) {
-					LOG(INFO) << "Setting video mode";
-					bmAddVideoMode( buffer, CamNum, bmdModeHD1080p2997 );
-				}
+			if(mode != bmdModeDetect) {
+				LOG(INFO) << "Setting video mode";
+				bmAddVideoMode( buffer, CamNum, bmdModeHD1080p2997 );
+			}
 
-			});
-		}
+		});
+	}
 
 	while( keepGoing ) {
 

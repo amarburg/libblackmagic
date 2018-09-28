@@ -10,27 +10,31 @@
 
 namespace libblackmagic {
 
-  const int maxDequeDepth = 10;
-
   InputHandler::InputHandler( DeckLink &parent )
     :  _frameCount(0), _noInputCount(0),
-     _currentConfig(),
+    _pixelFormat( bmdFormat8BitBGRA ),
+    _currentConfig(),
     _enabled( false ),
     _parent( parent ),
     _deckLink( _parent.deckLink() ),
     _deckLinkInput(  nullptr ),
-    _deckLinkOutput( nullptr ),
+    //_deckLinkOutput( nullptr ),
     _grabbedImages(),
     _queue()
   {
     _deckLink->AddRef();
 
+    CHECK( _deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&_deckLinkInput) == S_OK );
+    CHECK( _deckLinkInput != NULL ) << "Couldn't get DecklinkInput";
+
+    // CHECK( _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput) == S_OK );
+    // CHECK( _deckLinkOutput != nullptr ) << "Couldn't get DecklinkOutput";
 
   }
 
   InputHandler::~InputHandler() {
     if( _deckLinkInput ) _deckLinkInput->Release();
-    if( _deckLinkOutput ) _deckLinkOutput->Release();
+    //if( _deckLinkOutput ) _deckLinkOutput->Release();
     if( _deckLink ) _deckLink->Release();
   }
 
@@ -42,33 +46,13 @@ namespace libblackmagic {
     return 1;
   }
 
-  //=== Lazy initializers ===
-  IDeckLinkInput *InputHandler::deckLinkInput() {
-    if( _deckLinkInput )  return _deckLinkInput;
-
-    CHECK( _deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&_deckLinkInput) == S_OK );
-    CHECK( _deckLinkInput != NULL ) << "Couldn't get input for Decklink";
-
-    return _deckLinkInput;
-  }
-
-  IDeckLinkOutput *InputHandler::deckLinkOutput()
-  {
-    if( _deckLinkOutput ) return _deckLinkOutput;
-
-    CHECK( _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput) == S_OK );
-    CHECK( _deckLinkOutput != nullptr ) << "Couldn't get output for Decklink";
-
-    return _deckLinkOutput;
-  }
-
   //== ===  ===
 
 bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 
     // Hardcode some parameters for now
     BMDVideoInputFlags inputFlags = bmdVideoInputFlagDefault;
-    BMDPixelFormat pixelFormat = bmdFormat10BitYUV;
+    //BMDPixelFormat pixelFormat = _pix;
 
     IDeckLinkAttributes* deckLinkAttributes = NULL;
     bool formatDetectionSupported;
@@ -104,8 +88,8 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 
     // WHy iterate?  Just ask!
     BMDDisplayModeSupport displayModeSupported;
-    result = deckLinkInput()->DoesSupportVideoMode(mode,
-                                                    pixelFormat,
+    result = _deckLinkInput->DoesSupportVideoMode(mode,
+                                                    _pixelFormat,
                                                     inputFlags,
                                                     &displayModeSupported,
                                                     &displayMode);
@@ -123,19 +107,17 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 
     CHECK( displayMode != nullptr ) << "Unable to find a video input mode with the desired properties";
 
-    deckLinkInput()->SetCallback(this);
+    _deckLinkInput->SetCallback(this);
 
-    deckLinkInput()->DisableAudioInput();
+    _deckLinkInput->DisableAudioInput();
 
     // Made it this far?  Great!
-    if( S_OK != deckLinkInput()->EnableVideoInput(displayMode->GetDisplayMode(),
-                                                  pixelFormat,
+    if( S_OK != _deckLinkInput->EnableVideoInput(displayMode->GetDisplayMode(),
+                                                  _pixelFormat,
                                                   inputFlags) ) {
         LOG(WARNING) << "Failed to enable video input. Is another application using the card?";
         return false;
     }
-
-    // Feed results
 
     LOG(INFO) << "DeckLinkInput complete!";
 
@@ -156,7 +138,7 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 
     LOG(INFO) << "Starting DeckLink input streams ....";
 
-    HRESULT result = deckLinkInput()->StartStreams();
+    HRESULT result = _deckLinkInput->StartStreams();
     if (result != S_OK) {
       LOG(WARNING) << "Failed to start input streams";
       return false;
@@ -168,7 +150,7 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 //-------
 bool InputHandler::stopStreams() {
   LOG(INFO) << " Stopping DeckLinkInput streams";
-  if (deckLinkInput()->StopStreams() != S_OK) {
+  if (_deckLinkInput->StopStreams() != S_OK) {
     LOG(WARNING) << "Failed to stop input streams";
     return false;
   }
@@ -221,7 +203,7 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   if( audioFrame ) audioFrame->Release();
 
   uint32_t availFrames;
-  if( deckLinkInput()->GetAvailableVideoFrameCount( &availFrames ) == S_OK ) {
+  if( _deckLinkInput->GetAvailableVideoFrameCount( &availFrames ) == S_OK ) {
     LOG(DEBUG) << "videoInputFrameArrives; " << availFrames << " still available";
   } else {
     LOG(DEBUG) << "videoInputFrameArrives";
@@ -290,7 +272,7 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
     }
 
 
-  std::thread t = processInThread( framePair );
+  std::thread t = std::thread([=] { process(framePair); });
   t.detach();
 
   if (threeDExtensions) threeDExtensions->Release();
@@ -311,18 +293,16 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
     LOG(INFO) << "(" << std::this_thread::get_id() << ") Received Video Input Format Changed";
 
     char*   displayModeName = nullptr;
-    BMDPixelFormat  pixelFormat = bmdFormat10BitYUV;
-
-    if (formatFlags & bmdDetectedVideoInputRGB444) pixelFormat = bmdFormat10BitRGB;
+    // BMDPixelFormat  pixelFormat = _pixelFormat; //bmdFormat10BitYUV;
+    // if (formatFlags & bmdDetectedVideoInputRGB444) pixelFormat = bmdFormat10BitRGB;
 
     mode->GetName((const char**)&displayModeName);
-    LOG(INFO) << "Input video format changed to " << displayModeName << " "
-    << ((formatFlags & bmdDetectedVideoInputRGB444) ? "RGB" : "YUV")
-    << ((formatFlags & bmdDetectedVideoInputDualStream3D) ? " with 3D" : " not 3D");
+    LOG(INFO) << "Input video format changed to " << displayModeName
+              << ((formatFlags & bmdDetectedVideoInputDualStream3D) ? " with 3D" : " not 3D");
 
     if (displayModeName) free(displayModeName);
 
-    deckLinkInput()->PauseStreams();
+    _deckLinkInput->PauseStreams();
 
     LOG(INFO) << "Enabling input at new resolution";
     enable( mode->GetDisplayMode(), true, formatFlags & bmdDetectedVideoInputDualStream3D );
@@ -334,8 +314,8 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
 
     LOG(INFO) << "Enabling output at new mode";
 
-    deckLinkInput()->FlushStreams();
-    deckLinkInput()->StartStreams();
+    _deckLinkInput->FlushStreams();
+    _deckLinkInput->StartStreams();
 
     _parent.sendInputFormatChanged( mode->GetDisplayMode() );
 
@@ -349,19 +329,9 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   //
   //
   //
-  bool InputHandler::process( FramePair framePair )
+  void InputHandler::process( FramePair framePair )
   {
     std::array<cv::Mat,2> out;
-
-    // Make a working Buffer
-    IDeckLinkMutableVideoFrame*     dstFrame = NULL;
-    HRESULT result = deckLinkOutput()->CreateVideoFrame( framePair[0]->GetWidth(), framePair[0]->GetHeight(),  framePair[0]->GetWidth() * 4,
-                                                          bmdFormat8BitBGRA, bmdFrameFlagDefault, &dstFrame);
-    if (result != S_OK)
-    {
-      LOG(WARNING) << "Failed to create destination video frame";
-      goto bail;
-    }
 
     for( unsigned int i = 0; i < 2; i++ ) {
 
@@ -373,77 +343,65 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
 
       LOG(DEBUG) << frameName << " Processing frame...";
 
-        switch (videoFrame->GetPixelFormat()) {
-        case bmdFormat8BitYUV:
-        {
-          void* data;
-          if ( videoFrame->GetBytes(&data) != S_OK ) goto bail;
-          cv::Mat mat = cv::Mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC2, data, videoFrame->GetRowBytes());
-          cv::cvtColor(mat, out[i], cv::COLOR_YUV2BGR ); //_UYVY);
-          break;
+      void *data = nullptr;
+      if ( videoFrame->GetBytes(&data) == S_OK ) {
+
+        auto pixFmt = videoFrame->GetPixelFormat();
+        if( pixFmt == bmdFormat8BitYUV ) {
+          // YUV is stored as 2 pixels in 4 bytes
+          cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC2, data, videoFrame->GetRowBytes());
+          mat.copyTo( out[i] );
+        } else if ( pixFmt == bmdFormat8BitBGRA ) {
+          cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC4, data, videoFrame->GetRowBytes());
+          mat.copyTo( out[i] );
+        } else {
+          LOG(WARNING) << "Sorry, don't understand pixel format " << videoFrame->GetPixelFormat();
         }
-        case bmdFormat8BitBGRA:
-        {
-          void* data;
-          if ( videoFrame->GetBytes(&data) != S_OK ) goto bail;
 
-          cv::Mat mat = cv::Mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC4, data);
-          cv::cvtColor(mat, out[i], cv::COLOR_BGRA2BGR);
-          break;
-        }
-        default:
-        {
-          //CvMatDeckLinkVideoFrame cvMatWrapper(videoFrame->GetHeight(), videoFrame->GetWidth());
-        //  LOG(DEBUG) << frameName << "Converting through Blackmagic VideoConversionInstance to " << videoFrame->GetWidth() << " x " << videoFrame->GetHeight();
-
-          IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
-
-          //LOG(WARNING) << "Converting " << std::hex << videoFrame->GetPixelFormat() << " to " << dstFrame->GetPixelFormat();
-          result =  converter->ConvertFrame(videoFrame, dstFrame);
-
-          if (result != S_OK ) {
-            LOG(WARNING) << frameName << " Failed to do conversion " << std::hex << result;
-            goto bail;
-          }
-
-          void *buffer = nullptr;
-          if( dstFrame->GetBytes( &buffer ) != S_OK ) {
-            LOG(WARNING) << frameName << " Unable to get bytes from dstFrame";
-            goto bail;
-          }
-
-           cv::Mat dst( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
-
-           dst.copyTo( out[i] );
-
-          //cv::cvtColor(srcMat, out[i], cv::COLOR_BGRA2BGR);
-
-        }
       }
 
-
+      // Regardless of what happens, release the frames
       LOG(DEBUG) << frameName << " Release; " << videoFrame->Release() << " references remain";
 
     }
 
-    dstFrame->Release();
 
-    while( _queue.size() >= maxDequeDepth && _queue.pop_and_drop() ) {;}
+
+//    dstFrame->Release();
+
+    // while( _queue.size() >= maxDequeDepth && _queue.pop_and_drop() ) {;}
     _queue.push( out );
 
-    LOG(DEBUG) << " Push!  queue now " << _queue.size();
-    return true;
-
-
-  bail:
-    if( framePair[1] ) framePair[1]->Release();
-    if( framePair[0] ) framePair[0]->Release();
-
-    dstFrame->Release();
-
-    return false;
+    //LOG(DEBUG) << " Push!  queue now " << _queue.size();
 
   }
 
+
+  // == Old conversion code for posterity
+  // default:
+  // {
+  //   //CvMatDeckLinkVideoFrame cvMatWrapper(videoFrame->GetHeight(), videoFrame->GetWidth());
+  // //  LOG(DEBUG) << frameName << "Converting through Blackmagic VideoConversionInstance to " << videoFrame->GetWidth() << " x " << videoFrame->GetHeight();
+  //
+  //   IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
+  //
+  //   //LOG(WARNING) << "Converting " << std::hex << videoFrame->GetPixelFormat() << " to " << dstFrame->GetPixelFormat();
+  //   result =  converter->ConvertFrame(videoFrame, dstFrame);
+  //
+  //   if (result != S_OK ) {
+  //     LOG(WARNING) << frameName << " Failed to do conversion " << std::hex << result;
+  //     goto bail;
+  //   }
+  //
+  //   void *buffer = nullptr;
+  //   if( dstFrame->GetBytes( &buffer ) != S_OK ) {
+  //     LOG(WARNING) << frameName << " Unable to get bytes from dstFrame";
+  //     goto bail;
+  //   }
+  //
+  //    cv::Mat dst( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
+  //    dst.copyTo( out[i] );
+  //    //cv::cvtColor(srcMat, out[i], cv::COLOR_BGRA2BGR);
+  // }
 
 }
