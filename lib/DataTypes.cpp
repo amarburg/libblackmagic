@@ -52,8 +52,25 @@ namespace libblackmagic {
     return "(unknown)";
   }
 
+  //=== Pixel format to string ===========================
 
-  //=== Mode parameters table ===
+  const std::string pixelFormatToString( BMDPixelFormat pix )
+  {
+    if( pix == bmdFormat8BitYUV )
+      return "bmdFormat8BitYUV";
+    else if ( pix == bmdFormat8BitARGB )
+      return "bmdFormat8BitARGB";
+    else if ( pix == bmdFormat8BitBGRA )
+      return "bmdFormat8BitBGRA";
+    else if ( pix == bmdFormat10BitYUV )
+      return "bmdFormat10BitYUV";
+    return "(unknown)";
+  }
+
+
+
+
+  //=== Mode parameters table ============================
 
   ModeParams ModeParamsTable[] = {
     { bmdModeHD1080p2997, 1920, 1080, 29.97 },

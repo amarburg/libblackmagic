@@ -76,7 +76,6 @@ namespace libblackmagic {
     IDeckLink *_deckLink;
 
     IDeckLinkInput *_deckLinkInput;
-    //IDeckLinkOutput *_deckLinkOutput;
 
     // == input member related variables ==
     MatPair _grabbedImages;

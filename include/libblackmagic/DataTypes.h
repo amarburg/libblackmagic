@@ -10,8 +10,12 @@ enum {
 
 namespace libblackmagic {
 
+  //==  Display mode to string and vice versa ==
   BMDDisplayMode stringToDisplayMode( const std::string &str );
   const std::string displayModeToString( BMDDisplayMode mode );
+
+  //== Pixel format to string ==
+  const std::string pixelFormatToString( BMDPixelFormat pixFmt );
 
 
   struct ModeParams {

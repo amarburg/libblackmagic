@@ -12,7 +12,7 @@ namespace libblackmagic {
 
   InputHandler::InputHandler( DeckLink &parent )
     :  _frameCount(0), _noInputCount(0),
-    _pixelFormat( bmdFormat8BitBGRA ),
+    _pixelFormat( bmdFormat10BitYUV ),
     _currentConfig(),
     _enabled( false ),
     _parent( parent ),
@@ -26,9 +26,6 @@ namespace libblackmagic {
 
     CHECK( _deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&_deckLinkInput) == S_OK );
     CHECK( _deckLinkInput != NULL ) << "Couldn't get DecklinkInput";
-
-    // CHECK( _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput) == S_OK );
-    // CHECK( _deckLinkOutput != nullptr ) << "Couldn't get DecklinkOutput";
 
   }
 
@@ -79,9 +76,7 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
       }
     }
 
-    if( do3D ) {
-      inputFlags |= bmdVideoInputDualStream3D;
-    }
+    if( do3D ) inputFlags |= bmdVideoInputDualStream3D;
 
     //  IDeckLinkDisplayModeIterator* displayModeIterator = NULL;
     IDeckLinkDisplayMode *displayMode = nullptr;
@@ -110,6 +105,8 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
     _deckLinkInput->SetCallback(this);
 
     _deckLinkInput->DisableAudioInput();
+
+    LOG(INFO) << "Enabling video input with mode " << displayModeToString(displayMode->GetDisplayMode()) << " and pixel format " << pixelFormatToString( _pixelFormat );
 
     // Made it this far?  Great!
     if( S_OK != _deckLinkInput->EnableVideoInput(displayMode->GetDisplayMode(),
@@ -210,12 +207,9 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   }
 
   // Handle Video Frame
-  if (!videoFrame) {
-    return E_FAIL;
-  }
+  if (!videoFrame) return E_FAIL;
 
-  if (videoFrame->GetFlags() & bmdFrameHasNoInputSource)
-  {
+  if (videoFrame->GetFlags() & bmdFrameHasNoInputSource) {
     LOG(WARNING) << "(" << std::this_thread::get_id()
                         << ") Frame received (" << _frameCount
                         << ") - No input signal detected";
@@ -341,21 +335,45 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
 
       std::string frameName( _currentConfig.do3D() ? ((i==1) ? "[RIGHT]" : "[LEFT]") : "" );
 
-      LOG(DEBUG) << frameName << " Processing frame...";
+      //LOG(DEBUG) << frameName << " Processing frame with format " << pixelFormatToString( videoFrame->GetPixelFormat() );
 
       void *data = nullptr;
       if ( videoFrame->GetBytes(&data) == S_OK ) {
 
         auto pixFmt = videoFrame->GetPixelFormat();
+
         if( pixFmt == bmdFormat8BitYUV ) {
           // YUV is stored as 2 pixels in 4 bytes
           cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC2, data, videoFrame->GetRowBytes());
           mat.copyTo( out[i] );
-        } else if ( pixFmt == bmdFormat8BitBGRA ) {
+        } else if ( (pixFmt == bmdFormat8BitBGRA) || (pixFmt == bmdFormat8BitARGB) ) {
           cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC4, data, videoFrame->GetRowBytes());
           mat.copyTo( out[i] );
         } else {
-          LOG(WARNING) << "Sorry, don't understand pixel format " << videoFrame->GetPixelFormat();
+
+          IDeckLinkOutput *deckLinkOutput = NULL;
+          CHECK( _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&deckLinkOutput) == S_OK );
+
+          IDeckLinkMutableVideoFrame*     dstFrame = NULL;
+          HRESULT result = deckLinkOutput->CreateVideoFrame(videoFrame->GetWidth(), videoFrame->GetHeight(),  4*videoFrame->GetWidth(),
+                                                                bmdFormat8BitBGRA, bmdFrameFlagDefault, &dstFrame);
+          CHECK(result == S_OK) << "Failed to create destination video frame";
+
+          IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
+
+          LOG(DEBUG) << "Converting " << std::hex << pixelFormatToString(videoFrame->GetPixelFormat()) << " to " << pixelFormatToString(dstFrame->GetPixelFormat());
+          result =  converter->ConvertFrame(videoFrame, dstFrame);
+
+          CHECK(result == S_OK ) << frameName << " Failed to do conversion " << std::hex << result;
+
+          void *buffer = nullptr;
+          CHECK( dstFrame->GetBytes( &buffer ) == S_OK ) << frameName << " Unable to get bytes from dstFrame";
+
+           cv::Mat dst( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
+           dst.copyTo( out[i] );
+
+           dstFrame->Release();
+           deckLinkOutput->Release();
         }
 
       }
