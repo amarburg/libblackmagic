@@ -26,9 +26,10 @@ namespace libblackmagic {
   {
   public:
 
-    typedef std::array<cv::Mat,2> MatPair;
-    typedef std::array<IDeckLinkVideoFrame *, 2> FramePair;
-    typedef active_object::bounded_shared_queue< MatPair, 10 > Queue;
+    typedef std::vector<cv::Mat> MatVector;
+    typedef std::vector<IDeckLinkVideoFrame *> FrameVector;
+
+    typedef active_object::bounded_shared_queue< MatVector, 10 > Queue;
 
     InputHandler( DeckLink &deckLink );
     virtual ~InputHandler();
@@ -61,7 +62,9 @@ namespace libblackmagic {
   protected:
 
     // Process input frames
-    void process( FramePair frames );
+    void process( FrameVector frames );
+    void frameToMat( IDeckLinkVideoFrame *videoFrame, cv::OutputArray mat, int i );
+
 
   private:
 
@@ -78,7 +81,7 @@ namespace libblackmagic {
     IDeckLinkInput *_deckLinkInput;
 
     // == input member related variables ==
-    MatPair _grabbedImages;
+    MatVector _grabbedImages;
     Queue _queue;
 
   };

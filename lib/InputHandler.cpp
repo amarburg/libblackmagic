@@ -10,6 +10,11 @@
 
 namespace libblackmagic {
 
+  using std::shared_ptr;
+  using std::vector;
+  using std::deque;
+  using std::thread;
+
   InputHandler::InputHandler( DeckLink &parent )
     :  _frameCount(0), _noInputCount(0),
     _pixelFormat( bmdFormat10BitYUV ),
@@ -236,10 +241,10 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
                 << " x " << videoFrame->GetHeight();
 
     // The AddRef will ensure the frame is valid after the end of the callback.
-    FramePair framePair;
+    FrameVector frameVector;
 
     videoFrame->AddRef();
-    framePair[0] = videoFrame;
+    frameVector.push_back( videoFrame );
 
     // If 3D mode is enabled we retreive the 3D extensions interface which gives.
     // us access to the right eye frame by calling GetFrameForRightEye() .
@@ -258,7 +263,7 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
                   << " x " << rightEyeFrame->GetHeight();
 
       //rightEyeFrame->AddRef();
-      framePair[1] = rightEyeFrame;
+      frameVector.push_back( rightEyeFrame );
 
       // The AddRef will ensure the frame is valid after the end of the callback.
       // std::thread t = processInThread( rightEyeFrame, 1 );
@@ -266,7 +271,7 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
     }
 
 
-  std::thread t = std::thread([=] { process(framePair); });
+  std::thread t = std::thread([=] { process(frameVector); });
   t.detach();
 
   if (threeDExtensions) threeDExtensions->Release();
@@ -323,103 +328,77 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   //
   //
   //
-  void InputHandler::process( FramePair framePair )
+  void InputHandler::process( FrameVector frameVector )
   {
-    std::array<cv::Mat,2> out;
+    MatVector out( frameVector.size() );
 
-    for( unsigned int i = 0; i < 2; i++ ) {
+    deque< shared_ptr<thread> > workers;
 
-      if( framePair[i] == nullptr ) continue;
-
-      IDeckLinkVideoFrame *videoFrame = framePair[i];
-
-      std::string frameName( _currentConfig.do3D() ? ((i==1) ? "[RIGHT]" : "[LEFT]") : "" );
-
-      //LOG(DEBUG) << frameName << " Processing frame with format " << pixelFormatToString( videoFrame->GetPixelFormat() );
-
-      void *data = nullptr;
-      if ( videoFrame->GetBytes(&data) == S_OK ) {
-
-        auto pixFmt = videoFrame->GetPixelFormat();
-
-        if( pixFmt == bmdFormat8BitYUV ) {
-          // YUV is stored as 2 pixels in 4 bytes
-          cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC2, data, videoFrame->GetRowBytes());
-          mat.copyTo( out[i] );
-        } else if ( (pixFmt == bmdFormat8BitBGRA) || (pixFmt == bmdFormat8BitARGB) ) {
-          cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC4, data, videoFrame->GetRowBytes());
-          mat.copyTo( out[i] );
-        } else {
-
-          IDeckLinkOutput *deckLinkOutput = NULL;
-          CHECK( _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&deckLinkOutput) == S_OK );
-
-          IDeckLinkMutableVideoFrame*     dstFrame = NULL;
-          HRESULT result = deckLinkOutput->CreateVideoFrame(videoFrame->GetWidth(), videoFrame->GetHeight(),  4*videoFrame->GetWidth(),
-                                                                bmdFormat8BitBGRA, bmdFrameFlagDefault, &dstFrame);
-          CHECK(result == S_OK) << "Failed to create destination video frame";
-
-          IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
-
-          LOG(DEBUG) << "Converting " << std::hex << pixelFormatToString(videoFrame->GetPixelFormat()) << " to " << pixelFormatToString(dstFrame->GetPixelFormat());
-          result =  converter->ConvertFrame(videoFrame, dstFrame);
-
-          CHECK(result == S_OK ) << frameName << " Failed to do conversion " << std::hex << result;
-
-          void *buffer = nullptr;
-          CHECK( dstFrame->GetBytes( &buffer ) == S_OK ) << frameName << " Unable to get bytes from dstFrame";
-
-           cv::Mat dst( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
-           dst.copyTo( out[i] );
-
-           dstFrame->Release();
-           deckLinkOutput->Release();
-        }
-
-      }
-
-      // Regardless of what happens, release the frames
-      LOG(DEBUG) << frameName << " Release; " << videoFrame->Release() << " references remain";
-
+    for( unsigned int i = 1; i < frameVector.size(); ++i ) {
+      workers.push_back( shared_ptr<thread>(new std::thread( &InputHandler::frameToMat, this, frameVector[i], out[i], i )) );
     }
 
+    frameToMat( frameVector[0], out[0], 0 );
 
+    for( auto worker : workers ) worker->join();
 
-//    dstFrame->Release();
-
-    // while( _queue.size() >= maxDequeDepth && _queue.pop_and_drop() ) {;}
     _queue.push( out );
-
-    //LOG(DEBUG) << " Push!  queue now " << _queue.size();
-
   }
 
 
-  // == Old conversion code for posterity
-  // default:
-  // {
-  //   //CvMatDeckLinkVideoFrame cvMatWrapper(videoFrame->GetHeight(), videoFrame->GetWidth());
-  // //  LOG(DEBUG) << frameName << "Converting through Blackmagic VideoConversionInstance to " << videoFrame->GetWidth() << " x " << videoFrame->GetHeight();
-  //
-  //   IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
-  //
-  //   //LOG(WARNING) << "Converting " << std::hex << videoFrame->GetPixelFormat() << " to " << dstFrame->GetPixelFormat();
-  //   result =  converter->ConvertFrame(videoFrame, dstFrame);
-  //
-  //   if (result != S_OK ) {
-  //     LOG(WARNING) << frameName << " Failed to do conversion " << std::hex << result;
-  //     goto bail;
-  //   }
-  //
-  //   void *buffer = nullptr;
-  //   if( dstFrame->GetBytes( &buffer ) != S_OK ) {
-  //     LOG(WARNING) << frameName << " Unable to get bytes from dstFrame";
-  //     goto bail;
-  //   }
-  //
-  //    cv::Mat dst( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
-  //    dst.copyTo( out[i] );
-  //    //cv::cvtColor(srcMat, out[i], cv::COLOR_BGRA2BGR);
-  // }
+  void InputHandler::frameToMat( IDeckLinkVideoFrame *videoFrame, cv::OutputArray out, int i )
+  {
+    CHECK( videoFrame != nullptr ) << "Input VideoFrame in frameToMat";
+    //CHECK( out ) << "Output Mat undefined in frameToMat";
+
+    std::string frameName( _currentConfig.do3D() ? ((i==1) ? "[RIGHT]" : "[LEFT]") : "" );
+
+    //LOG(DEBUG) << frameName << " Processing frame with format " << pixelFormatToString( videoFrame->GetPixelFormat() );
+
+    void *data = nullptr;
+    if ( videoFrame->GetBytes(&data) == S_OK ) {
+
+      auto pixFmt = videoFrame->GetPixelFormat();
+
+      if( pixFmt == bmdFormat8BitYUV ) {
+        // YUV is stored as 2 pixels in 4 bytes
+        cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC2, data, videoFrame->GetRowBytes());
+        mat.copyTo( out );
+      } else if ( (pixFmt == bmdFormat8BitBGRA) || (pixFmt == bmdFormat8BitARGB) ) {
+        cv::Mat mat(videoFrame->GetHeight(), videoFrame->GetWidth(), CV_8UC4, data, videoFrame->GetRowBytes());
+        mat.copyTo( out );
+      } else {
+
+        IDeckLinkOutput *deckLinkOutput = NULL;
+        CHECK( _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&deckLinkOutput) == S_OK );
+
+        IDeckLinkMutableVideoFrame*     dstFrame = NULL;
+        HRESULT result = deckLinkOutput->CreateVideoFrame(videoFrame->GetWidth(), videoFrame->GetHeight(),  4*videoFrame->GetWidth(),
+                                                              bmdFormat8BitBGRA, bmdFrameFlagDefault, &dstFrame);
+        CHECK(result == S_OK) << "Failed to create destination video frame";
+
+        IDeckLinkVideoConversion *converter =  CreateVideoConversionInstance();
+
+        LOG(DEBUG) << "Converting " << std::hex << pixelFormatToString(videoFrame->GetPixelFormat()) << " to " << pixelFormatToString(dstFrame->GetPixelFormat());
+        result =  converter->ConvertFrame(videoFrame, dstFrame);
+
+        CHECK(result == S_OK ) << frameName << " Failed to do conversion " << std::hex << result;
+
+        void *buffer = nullptr;
+        CHECK( dstFrame->GetBytes( &buffer ) == S_OK ) << frameName << " Unable to get bytes from dstFrame";
+
+         cv::Mat dst( cv::Size(dstFrame->GetWidth(), dstFrame->GetHeight()), CV_8UC4, buffer, dstFrame->GetRowBytes() );
+         dst.copyTo( out );
+
+         dstFrame->Release();
+         deckLinkOutput->Release();
+      }
+
+    }
+
+    // Regardless of what happens, release the frames
+    LOG(DEBUG) << frameName << " Release; " << videoFrame->Release() << " references remain";
+
+  }
 
 }

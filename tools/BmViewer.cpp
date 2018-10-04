@@ -244,52 +244,45 @@ int main( int argc, char** argv )
 		std::chrono::steady_clock::time_point loopStart( std::chrono::steady_clock::now() );
 		//if( (duration > 0) && (loopStart > end) ) { keepGoing = false;  break; }
 
-		int numImages = 0;
-		if( (numImages = deckLink.input().grab()) > 0 ) {
-			std::array<cv::Mat,2> images;
+		InputHandler::MatVector images;
+		if( !deckLink.input().queue().wait_for_pop( images, std::chrono::milliseconds(100) ) ) {
+			//
+			++miss;
+			continue;
+		}
 
-			for( unsigned int i=0; i < (unsigned int)count && i < images.size(); ++i ) {
-				deckLink.input().getRawImage(i, images[i]);
-			}
+		if( !noDisplay ) {
 
-			if( !noDisplay ) {
+			const int numImages = images.size();
 
-				if( numImages == 1 && !images[0].empty()  ) {
-					cv::imshow("Image", images[0]);
-				} else if ( numImages == 2 ) {
+			if( numImages == 1 && !images[0].empty()  ) {
+				cv::imshow("Image", images[0]);
+			} else if ( numImages == 2 ) {
 
-					cv::Mat composite( cv::Size( images[0].size().width + images[0].size().width,
-					std::max(images[0].size().height, images[1].size().height )), images[0].type() );
+				cv::Mat composite( cv::Size( images[0].size().width + images[0].size().width,
+				std::max(images[0].size().height, images[1].size().height )), images[0].type() );
 
-					if( !images[0].empty() ) {
-						cv::Mat leftROI( composite, cv::Rect(0,0,images[0].size().width,images[0].size().height) );
-						images[0].copyTo( leftROI );
-					}
-
-					if( !images[1].empty() ) {
-						cv::Mat rightROI( composite, cv::Rect(images[0].size().width, 0, images[1].size().width, images[1].size().height) );
-						images[1].copyTo( rightROI );
-					}
-
-					cv::imshow("Composite", composite );
-
+				if( !images[0].empty() ) {
+					cv::Mat leftROI( composite, cv::Rect(0,0,images[0].size().width,images[0].size().height) );
+					images[0].copyTo( leftROI );
 				}
 
-				LOG_IF(INFO, (displayed % 50) == 0) << "Frame #" << displayed;
-				char c = cv::waitKey(1);
+				if( !images[1].empty() ) {
+					cv::Mat rightROI( composite, cv::Rect(images[0].size().width, 0, images[1].size().width, images[1].size().height) );
+					images[1].copyTo( rightROI );
+				}
 
-				++displayed;
+				cv::imshow("Composite", composite );
 
-				// Take action on character
-				processKbInput( c, deckLink );
 			}
 
+			LOG_IF(INFO, (displayed % 50) == 0) << "Frame #" << displayed;
+			char c = cv::waitKey(1);
 
-		} else {
-			// if grab() fails
-			LOG(INFO) << "unable to grab frame";
-			++miss;
-			std::this_thread::sleep_for(std::chrono::microseconds(1000));
+			++displayed;
+
+			// Take action on character
+			processKbInput( c, deckLink );
 		}
 
 		++count;
