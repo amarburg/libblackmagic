@@ -335,7 +335,7 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
     deque< shared_ptr<thread> > workers;
 
     for( unsigned int i = 1; i < frameVector.size(); ++i ) {
-      workers.push_back( shared_ptr<thread>(new std::thread( &InputHandler::frameToMat, this, frameVector[i], out[i], i )) );
+      workers.push_back( shared_ptr<thread>(new std::thread( &InputHandler::frameToMat, this, frameVector[i], std::ref(out[i]), i )) );
     }
 
     frameToMat( frameVector[0], out[0], 0 );
@@ -346,7 +346,7 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   }
 
 
-  void InputHandler::frameToMat( IDeckLinkVideoFrame *videoFrame, cv::OutputArray out, int i )
+  void InputHandler::frameToMat( IDeckLinkVideoFrame *videoFrame, cv::Mat &out, int i )
   {
     CHECK( videoFrame != nullptr ) << "Input VideoFrame in frameToMat";
     //CHECK( out ) << "Output Mat undefined in frameToMat";

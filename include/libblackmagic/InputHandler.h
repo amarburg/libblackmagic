@@ -63,7 +63,7 @@ namespace libblackmagic {
 
     // Process input frames
     void process( FrameVector frames );
-    void frameToMat( IDeckLinkVideoFrame *videoFrame, cv::OutputArray mat, int i );
+    void frameToMat( IDeckLinkVideoFrame *videoFrame, cv::Mat &mat, int i );
 
 
   private:
