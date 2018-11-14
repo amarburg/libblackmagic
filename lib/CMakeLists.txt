@@ -9,7 +9,7 @@ fips_begin_module( blackmagic )
     ${BLACKMAGIC_SRCS}
   )
 
-  fips_deps( bmsdi_protocol g3logger )
+  fips_deps( bmsdi-protocol g3logger )
   fips_libs( ${OpenCV_LIBS} dl )
 
   #  fips_include_directories(

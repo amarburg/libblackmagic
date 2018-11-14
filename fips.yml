@@ -2,14 +2,14 @@ imports:
     fips-googletest:
         git: https://github.com/amarburg/fips-googletest.git
         cond: "FIPS_UNITTESTS"
-    libactive_object:
-        git: https://github.com/amarburg/libactive_object.git
+    libactiveobject:
+        git: https://github.com/apl-ocean-engineering/libactiveobject.git
     libg3logger:
-        git: https://github.com/amarburg/libg3logger.git
-    libbmsdi_protocol:
-        git: https://github.com/amarburg/libbmsdi_protocol.git
-    fips-CLI11:
-        git: https://github.com/amarburg/fips-CLI11.git
+        git: https://github.com/apl-ocean-engineering/libg3logger.git
+    libbmsdi-protocol:
+        git: https://github.com/apl-ocean-engineering/libbmsdi-protocol.git
+    CLI11-fips:
+        git: https://github.com/amarburg/CLI11-fips.git
         cond: "NOT FIPS_IMPORT"    ## Only needed if building tools/
 
 exports:
