@@ -1,5 +1,5 @@
 
-#include <DeckLinkAPI.h>
+#include "libblackmagic/DeckLinkAPI_Version.h"
 
 #include <g3log/g3log.hpp>
 
@@ -48,18 +48,24 @@ namespace libblackmagic {
 	  BMDVideoOutputFlags outputFlags  = bmdVideoOutputVANC;
 	  HRESULT result;
 
-	  BMDDisplayModeSupport support;
-		IDeckLinkDisplayMode *displayMode = nullptr;
+	  BMDDisplayModeSupport_v10_11 support;
+		bool isSupported = false;
 
-	  if( deckLinkOutput()->DoesSupportVideoMode( mode, 0, outputFlags, &support, &displayMode ) != S_OK) {
+	  if( deckLinkOutput()->DoesSupportVideoMode( bmdVideoConnectionSDI, mode, 0, outputFlags, &support, &isSupported ) != S_OK) {
 	    LOG(WARNING) << "Unable to find a query output modes";
 	    return false;
 	  }
 
-	  if( support == bmdDisplayModeNotSupported ) {
+	  if( support == bmdDisplayModeNotSupported_v10_11 ) {
 	    LOG(WARNING) << "Display mode not supported";
 	    return false;
 	  }
+
+		IDeckLinkDisplayMode *displayMode = nullptr;
+		if( deckLinkOutput()->GetDisplayMode( mode, &displayMode ) != S_OK ) {
+			LOG(WARNING) << "Unable to get display mode";
+			return false;
+		}
 
 	  // Enable video output
 		LOG(INFO) << "Enabled output with mode " << displayModeToString(mode) << " (0x" << std::hex <<  mode << ") and flags " << outputFlags;
@@ -85,7 +91,7 @@ namespace libblackmagic {
 	  }
 
 		// _config.setMode( displayMode->GetDisplayMode() );
-	  displayMode->Release();
+	  //displayMode->Release();
 
 		_totalFramesScheduled = 0;
 		scheduleFrame( blankFrame() );

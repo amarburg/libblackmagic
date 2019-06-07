@@ -2,7 +2,7 @@
 
 #include <string>
 
-#include <DeckLinkAPI.h>
+#include "DeckLinkAPI_Version.h"
 
 enum {
   bmdModeDetect = /* 'auto' */ 0x6175746F,

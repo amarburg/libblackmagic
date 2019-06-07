@@ -1,6 +1,6 @@
 #pragma once
 
-#include <DeckLinkAPI.h>
+#include "DeckLinkAPI_Version.h"
 
 #include "libbmsdi/bmsdi_message.h"
 

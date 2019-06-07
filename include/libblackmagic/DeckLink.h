@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-#include <DeckLinkAPI.h>
+#include "DeckLinkAPI_Version.h"
 
 #include "active_object/active.h"
 

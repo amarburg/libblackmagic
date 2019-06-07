@@ -1,7 +1,7 @@
 
 #include <string>
 
-#include <DeckLinkAPIVersion.h>
+#include "libblackmagic/DeckLinkAPI_Version.h"
 
 #include "g3log/loglevels.hpp"
 #include "libg3logger/g3logger.h"
@@ -56,18 +56,18 @@ namespace libblackmagic {
 
     int i = 0;
     while( (deckLinkIterator->Next(&dl)) == S_OK ) {
-      char *modelName, *displayName;
-      if( dl->GetModelName( (const char **)&modelName ) != S_OK ) {
+      const char *modelName=NULL, *displayName=NULL;
+      if( dl->GetModelName( &modelName ) != S_OK ) {
         LOG(WARNING) << "Unable to query model name.";
       }
-      if( dl->GetDisplayName( (const char **)&displayName ) != S_OK ) {
+      if( dl->GetDisplayName( &displayName ) != S_OK ) {
         LOG(WARNING) << "Unable to query display name.";
       }
 
       LOG(INFO) << "#" << i << " model name: " << modelName << "; display name: " << displayName;
 
-      free(modelName);
-      free(displayName);
+      // free(modelName);
+      // free(displayName);
       i++;
     }
 
