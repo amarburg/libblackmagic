@@ -12,8 +12,4 @@ fips_begin_module( blackmagic )
   fips_deps( bmsdi-protocol g3logger )
   fips_libs( ${OpenCV_LIBS} dl )
 
-  #  fips_include_directories(
-  #  ${CMAKE_CURRENT_SOURCE_DIR}
-  #  ${CMAKE_SOURCE_DIR}/include/libblackmagic
-  #)
 fips_end_module()

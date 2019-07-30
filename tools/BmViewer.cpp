@@ -130,7 +130,7 @@ int main( int argc, char** argv )
 
 	signal( SIGINT, signal_handler );
 
-	CLI::App app{"Simple BlackMagic camera recorder"};
+	CLI::App app{"Simple BlackMagic camera viewer."};
 
 	int verbosity = 0;
 	app.add_flag("-v", verbosity, "Additional output (use -vv for even more!)");

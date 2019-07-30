@@ -10,9 +10,6 @@ endif()
 
 list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake)
 
-# find_package(Eigen3 REQUIRED )
-# find_package(Boost COMPONENTS filesystem system program_options REQUIRED )  #n.b. program_options is only required for my version of Stereolabs "Recorder"
-
 ## Default OpenCV version
 list(APPEND OPENCV_COMPONENTS core highgui imgproc )
 find_package(OpenCV COMPONENTS ${OPENCV_COMPONENTS} REQUIRED)

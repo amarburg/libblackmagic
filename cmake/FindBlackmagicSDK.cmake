@@ -22,10 +22,10 @@ else()
 endif()
 
 SET(TRIAL_PATHS
- $ENV{BLACKMAGIC_ROOT}/${BM_ARCH}/include
- ${BLACKMAGIC_ROOT}/${BM_ARCH}/include
- $ENV{BLACKMAGIC_ROOT}/include
- ${BLACKMAGIC_ROOT}/include
+ $ENV{BLACKMAGIC_DIR}/${BM_ARCH}/include
+ ${BLACKMAGIC_DIR}/${BM_ARCH}/include
+ $ENV{BLACKMAGIC_DIR}/include
+ ${BLACKMAGIC_DIR}/include
 )
 
 find_path(BLACKMAGIC_INCLUDE_DIR DeckLinkAPI.h
