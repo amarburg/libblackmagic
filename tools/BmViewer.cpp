@@ -146,8 +146,11 @@ int main( int argc, char** argv )
 	string desiredModeString = "1080p2997";
 	app.add_option("--mode,-m", desiredModeString, "Desired mode");
 
-	bool doConfigCamera = false;
-	app.add_flag("--config-camera,-c", doConfigCamera, "If enabled, send initialization info to the cameras");
+	bool skipAutoConfig = false;
+	app.add_flag("--no-auto-mode", skipAutoConfig, "Don't do auto mode detection");
+
+	bool skipConfigCamera = false;
+	app.add_flag("--no-config-camera,-c", skipConfigCamera, "Skip sending config info to cameras");
 
 	bool doListCards = false;
 	app.add_flag("--list-cards", doListCards, "List Decklink cards in the system then exit");
@@ -202,14 +205,22 @@ int main( int argc, char** argv )
 		LOG(WARNING) << "Didn't understand mode \"" << desiredModeString << "\"";
 		return -1;
 	} else if ( mode == bmdModeDetect ) {
-		LOG(WARNING) << "Card will always attempt automatic detection, starting in HD1080p2997 mode";
-		mode = bmdModeHD1080p2997;
+		LOG(WARNING) << "Card will attempt automatic detection, starting in HD1080p2997 mode";
+		mode = bmdModeHD1080p30;
 	} else {
-		LOG(WARNING) << "Setting mode " << desiredModeString;
+		LOG(WARNING) << "Setting initial mode " << desiredModeString;
 	}
 
-	deckLink.input().enable( mode, true, do3D );
-	deckLink.output().enable( mode );
+	const bool doAutoConfig = !skipAutoConfig;
+	if( !deckLink.input().enable( mode, doAutoConfig, do3D ) ) {
+		LOG(WARNING) << "Failed to enable input";
+		return -1;
+	}
+
+	if( !deckLink.output().enable( mode, false ) ) {
+		LOG(WARNING) << "Failed to enable output";
+		return -1;
+	}
 
 	// Need to wait for initialization
 //	if( decklink.initializedSync.wait_for( std::chrono::seconds(1) ) == false || !decklink.initialized() ) {
@@ -231,7 +242,7 @@ int main( int argc, char** argv )
 	LOG(INFO) << "Streams started!";
 
 
-	if ( doConfigCamera ) {
+	if ( !skipConfigCamera ) {
 		LOG(INFO) << "Sending configuration to cameras";
 
 		// Be careful not to exceed 255 byte buffer length
@@ -239,16 +250,18 @@ int main( int argc, char** argv )
 		guard( [mode]( BMSDIBuffer *buffer ) {
 
 			bmAddOrdinalAperture( buffer, CamNum, 0 );
-			bmAddSensorGain( buffer, CamNum, 8 );
+			//bmAddSensorGain( buffer, CamNum, 8 );
 			bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
-			bmAddAutoWhiteBalance( buffer, CamNum );
+			//bmAddAutoWhiteBalance( buffer, CamNum );
 
 			if(mode != bmdModeDetect) {
-				LOG(INFO) << "Setting video mode";
-				bmAddVideoMode( buffer, CamNum, bmdModeHD1080p2997 );
+				LOG(INFO) << "Sending video mode " << displayModeToString( mode ) << " to camera";
+				bmAddVideoMode( buffer, CamNum, mode );
 			}
 
 		});
+	} else {
+		LOG(DEBUG) << " .. _NOT_ sending config info to cameras";
 	}
 
 	while( keepGoing ) {

@@ -42,24 +42,32 @@ namespace libblackmagic {
 		return _deckLinkOutput;
 	}
 
-	bool OutputHandler::enable( BMDDisplayMode mode )
+	bool OutputHandler::enable( BMDDisplayMode mode, bool do3D )
 	{
 
 	  BMDVideoOutputFlags outputFlags  = bmdVideoOutputVANC;
 	  HRESULT result;
 
-	  BMDDisplayModeSupport_v10_11 support;
+	  BMDDisplayMode actualMode;
 		bool isSupported = false;
 
-	  if( deckLinkOutput()->DoesSupportVideoMode( bmdVideoConnectionSDI, mode, 0, outputFlags, &support, &isSupported ) != S_OK) {
-	    LOG(WARNING) << "Unable to find a query output modes";
+		if( do3D ) {
+			LOG(INFO) << "  Configuring output for 3D";
+			outputFlags |= bmdVideoOutputDualStream3D;
+		}
+
+		result = deckLinkOutput()->DoesSupportVideoMode( bmdVideoConnectionSDI, mode,
+																										bmdFormat10BitYUV, outputFlags,
+																										&actualMode, &isSupported );
+	  if( result != S_OK) {
+	    LOG(WARNING) << "Could not query if output mode is supported (" << std::hex << result << ")";
 	    return false;
 	  }
 
-	  if( support == bmdDisplayModeNotSupported_v10_11 ) {
-	    LOG(WARNING) << "Display mode not supported";
-	    return false;
-	  }
+	  // if( support == bmdDisplayModeNotSupported_v10_11 ) {
+	  //   LOG(WARNING) << "Display mode not supported";
+	  //   return false;
+	  // }
 
 		IDeckLinkDisplayMode *displayMode = nullptr;
 		if( deckLinkOutput()->GetDisplayMode( mode, &displayMode ) != S_OK ) {
@@ -96,7 +104,7 @@ namespace libblackmagic {
 		_totalFramesScheduled = 0;
 		scheduleFrame( blankFrame() );
 
-	  LOG(DEBUG) << "DeckLinkOutput initialized!";
+	  LOG(INFO) << "DeckLinkOutput enabled!";
 		_enabled = true;
 	  return true;
 	}

@@ -23,6 +23,7 @@ namespace libblackmagic {
     _parent( parent ),
     _deckLink( _parent.deckLink() ),
     _deckLinkInput(  nullptr ),
+    _dlConfiguration( nullptr ),
     //_deckLinkOutput( nullptr ),
     _grabbedImages(),
     _queue()
@@ -32,10 +33,15 @@ namespace libblackmagic {
     CHECK( _deckLink->QueryInterface(IID_IDeckLinkInput, (void**)&_deckLinkInput) == S_OK );
     CHECK( _deckLinkInput != NULL ) << "Couldn't get DecklinkInput";
 
+    CHECK( _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&_dlConfiguration) == S_OK );
+
+    CHECK( _deckLink != nullptr );
+
   }
 
   InputHandler::~InputHandler() {
     if( _deckLinkInput ) _deckLinkInput->Release();
+    if( _dlConfiguration ) _dlConfiguration->Release();
     //if( _deckLinkOutput ) _deckLinkOutput->Release();
     if( _deckLink ) _deckLink->Release();
   }
@@ -53,36 +59,73 @@ namespace libblackmagic {
 bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 
     // Hardcode some parameters for now
-    BMDVideoInputFlags inputFlags = bmdVideoInputFlagDefault;
     //BMDPixelFormat pixelFormat = _pix;
+    BMDVideoInputFlags inputFlags = bmdVideoInputFlagDefault;
     BMDSupportedVideoModeFlags supportedFlags = bmdSupportedVideoModeDefault;
-    IDeckLinkAttributes_v10_11 *deckLinkAttributes = NULL;
+    IDeckLinkProfileAttributes *deckLinkAttributes = NULL;
     bool formatDetectionSupported;
 
     // Check the card supports format detection
-    auto result = _deckLink->QueryInterface(IID_IDeckLinkAttributes_v10_11, (void**)&deckLinkAttributes);
+    auto result = _deckLink->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&deckLinkAttributes);
     if (result != S_OK) {
       LOG(WARNING) << "Unable to query deckLinkAttributes";
       return false;
     }
 
     if( doAuto ) {
-      LOG(INFO) << "Automatic mode detection requested, checking for support";
+      LOG(INFO) << "Automatic mode detection requested";
 
       // Check for various desired features
       result = deckLinkAttributes->GetFlag(BMDDeckLinkSupportsInputFormatDetection, &formatDetectionSupported);
       if (result != S_OK || !formatDetectionSupported)
       {
-        LOG(WARNING) << "* Format detection is not supported on this device";
+        LOG(WARNING) << "      ... Format detection is not supported on this device";
         return false;
       } else {
-        LOG(INFO) << "* Enabling automatic format detection on input card.";
         inputFlags |= bmdVideoInputEnableFormatDetection;
       }
     }
 
-    //if( do3D ) inputFlags |= bmdVideoInputDualStream3D;
-    if( do3D ) supportedFlags |= bmdSupportedVideoModeDualStream3D;
+    if( do3D ) {
+      LOG(INFO) << "Configured input for 3D";
+      supportedFlags |= bmdSupportedVideoModeDualStream3D;
+      inputFlags |= bmdVideoInputDualStream3D;
+
+      //== Configure bmdDeckLinkConfigSDIInput3DPayloadOverride
+      //  If set to true, the device will capture two genlocked SDI streams
+      //  with matching video modes as a 3D stream.
+      {
+        // IDeckLinkConfiguration *dlConfiguration = NULL;
+        // // Check the card supports format detection
+        // auto result = _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&dlConfiguration);
+        // if (result == S_OK) {
+
+          CHECK( _dlConfiguration != nullptr ) << "_dlConfiguration is nullptr";
+
+          bool input3DPayloadOverride = false;
+          if( _dlConfiguration->GetFlag(bmdDeckLinkConfigSDIInput3DPayloadOverride, &input3DPayloadOverride) != S_OK ) {
+            LOG(WARNING) << "Unable to query bmdDeckLinkConfigSDIInput3DPayloadOverride";
+          }
+          LOG(INFO) << "  before setting, bmdDeckLinkConfigSDIInput3DPayloadOverride is " << (input3DPayloadOverride ? "true" : "false");
+
+          if( _dlConfiguration->SetFlag( bmdDeckLinkConfigSDIInput3DPayloadOverride, true ) != S_OK ) {
+            LOG(WARNING) << "Unable to set bmdDeckLinkConfigSDIInput3DPayloadOverride";
+          }
+
+          if( _dlConfiguration->GetFlag(bmdDeckLinkConfigSDIInput3DPayloadOverride, &input3DPayloadOverride) != S_OK ) {
+            LOG(WARNING) << "Unable to query bmdDeckLinkConfigSDIInput3DPayloadOverride";
+          }
+          LOG(INFO) << "  after setting, bmdDeckLinkConfigSDIInput3DPayloadOverride is " << (input3DPayloadOverride ? "true" : "false");
+        //
+        // } else {
+        //   LOG(WARNING) << "Unable to query dlConfiguration";
+        //   return false;
+        // }
+        //
+        // dlConfiguration->Release();
+      }
+
+    }
 
     // Why iterate?  Just ask!
     // BMDSupportedVideoModeFlags displayModeSupported;
@@ -93,16 +136,15 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
                                                     supportedFlags,
                                                     &isSupported );
 
-    if( isSupported == false ) {
-      LOG(WARNING) << "Requested mode is not supported (result = " << std::hex << result << ")";
-      return false;
-    }
-
     if( result != S_OK ) {
       LOG(WARNING) << "Error while checking if DeckLinkInput supports mode (result = " << result << ")";
       return false;
     }
 
+    if( !isSupported ) {
+      LOG(WARNING) << "Requested mode is not supported (result = " << std::hex << result << ")";
+      return false;
+    }
 
     IDeckLinkDisplayMode *displayMode = nullptr;
 		if( _deckLinkInput->GetDisplayMode( mode, &displayMode ) != S_OK ) {
@@ -118,37 +160,40 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
     CHECK( displayMode != nullptr ) << "Unable to find a video input mode with the desired properties";
 
     _deckLinkInput->SetCallback(this);
-
     _deckLinkInput->DisableAudioInput();
 
-    LOG(INFO) << "Enabling video input with mode " << displayModeToString(displayMode->GetDisplayMode()) << " and pixel format " << pixelFormatToString( _pixelFormat );
+    const auto flags = displayMode->GetFlags();
+
+    LOG(INFO) << "Enabling video input with mode " << displayModeToString(displayMode->GetDisplayMode())
+              << ( (flags & bmdDisplayModeSupports3D) ? " 3D" : "")
+              << " and pixel format " << pixelFormatToString( _pixelFormat );
 
     // Made it this far?  Great!
     if( S_OK != _deckLinkInput->EnableVideoInput(displayMode->GetDisplayMode(),
                                                   _pixelFormat,
-                                                  inputFlags) ) {
+                                                  inputFlags ) ) {
         LOG(WARNING) << "Failed to enable video input. Is another application using the card?";
         return false;
     }
 
-    LOG(INFO) << "DeckLinkInput complete!";
+    LOG(INFO) << "DeckLinkInput enabled!";
 
     // Update config with values
     _currentConfig.setMode( displayMode->GetDisplayMode() );
-    _currentConfig.set3D( displayMode->GetFlags() & bmdDetectedVideoInputDualStream3D );
+    _currentConfig.set3D( flags & bmdDisplayModeSupports3D );
 
     displayMode->Release();
 
-      _enabled = true;
-      return true;
-    }
+    _enabled = true;
+    return true;
+  }
 
 
 //-------
   bool InputHandler::startStreams() {
     if( !_enabled && !enable() ) return false;
 
-    LOG(INFO) << "Starting DeckLink input streams ....";
+    LOG(DEBUG) << "Starting DeckLinkInput streams ....";
 
     HRESULT result = _deckLinkInput->StartStreams();
     if (result != S_OK) {
@@ -161,7 +206,7 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 
 //-------
 bool InputHandler::stopStreams() {
-  LOG(INFO) << " Stopping DeckLinkInput streams";
+  LOG(DEBUG) << " Stopping DeckLinkInput streams";
   if (_deckLinkInput->StopStreams() != S_OK) {
     LOG(WARNING) << "Failed to stop input streams";
     return false;
@@ -206,11 +251,9 @@ int InputHandler::getRawImage( int i, cv::Mat &mat ) {
 //====== Input callbacks =====
 
 // Callbacks are called in a private thread....
-HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFrame, IDeckLinkAudioInputPacket* audioFrame)
+HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFrame,
+                                              IDeckLinkAudioInputPacket* audioFrame )
 {
-
-  IDeckLinkVideoFrame3DExtensions *threeDExtensions = nullptr;
-
   // Drop audio first thing
   if( audioFrame ) audioFrame->Release();
 
@@ -225,7 +268,7 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   if (!videoFrame) return E_FAIL;
 
   if (videoFrame->GetFlags() & bmdFrameHasNoInputSource) {
-    LOG(WARNING) << "(" << std::this_thread::get_id()
+    LOG(WARNING) << "(thread " << std::this_thread::get_id()
                         << ") Frame received (" << _frameCount
                         << ") - No input signal detected";
 
@@ -234,51 +277,52 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
   }
 
 
-    // const char *timecodeString = nullptr;
-    // if (g_config.m_timecodeFormat != 0)
-    // {
-    //   IDeckLinkTimecode *timecode;
-    //   if (videoFrame->GetTimecode(g_config.m_timecodeFormat, &timecode) == S_OK)
-    //   {
-    //     timecode->GetString(&timecodeString);
-    //   }
-    // }
+  // const char *timecodeString = nullptr;
+  // if (g_config.m_timecodeFormat != 0)
+  // {
+  //   IDeckLinkTimecode *timecode;
+  //   if (videoFrame->GetTimecode(g_config.m_timecodeFormat, &timecode) == S_OK)
+  //   {
+  //     timecode->GetString(&timecodeString);
+  //   }
+  // }
 
-    LOG(DEBUG) << "(" << std::this_thread::get_id()
-                << ") Frame received (" << _frameCount
-                << ") " << videoFrame->GetRowBytes() * videoFrame->GetHeight()
-                << " bytes, " << videoFrame->GetWidth()
-                << " x " << videoFrame->GetHeight();
+  LOG(DEBUG) << "(thread " << std::hex << std::this_thread::get_id() << std::dec
+              << ") Frame received (" << _frameCount
+              << ") " << videoFrame->GetRowBytes() * videoFrame->GetHeight()
+              << " bytes, " << videoFrame->GetWidth()
+              << " x " << videoFrame->GetHeight();
+
+  // The AddRef will ensure the frame is valid after the end of the callback.
+  FrameVector frameVector;
+
+  videoFrame->AddRef();
+  frameVector.push_back( videoFrame );
+
+  // If 3D mode is enabled we retreive the 3D extensions interface which gives.
+  // us access to the right eye frame by calling GetFrameForRightEye() .
+  IDeckLinkVideoFrame3DExtensions *threeDExtensions = nullptr;
+  if( videoFrame->QueryInterface(IID_IDeckLinkVideoFrame3DExtensions, (void **) &threeDExtensions) == S_OK ) {
+
+    IDeckLinkVideoFrame *rightEyeFrame = nullptr;
+
+    if(threeDExtensions->GetFrameForRightEye(&rightEyeFrame) != S_OK) {
+      LOG(INFO) << "Error getting right eye frame";
+    }
+
+    LOG(DEBUG) << "(" << std::hex << std::this_thread::get_id() << std::dec
+                << ") Right frame received (" << _frameCount
+                << ") " << rightEyeFrame->GetRowBytes() * rightEyeFrame->GetHeight()
+                << " bytes, " << rightEyeFrame->GetWidth()
+                << " x " << rightEyeFrame->GetHeight();
+
+    //rightEyeFrame->AddRef();
+    frameVector.push_back( rightEyeFrame );
 
     // The AddRef will ensure the frame is valid after the end of the callback.
-    FrameVector frameVector;
-
-    videoFrame->AddRef();
-    frameVector.push_back( videoFrame );
-
-    // If 3D mode is enabled we retreive the 3D extensions interface which gives.
-    // us access to the right eye frame by calling GetFrameForRightEye() .
-    if( videoFrame->QueryInterface(IID_IDeckLinkVideoFrame3DExtensions, (void **) &threeDExtensions) == S_OK ) {
-
-      IDeckLinkVideoFrame *rightEyeFrame = nullptr;
-
-      if(threeDExtensions->GetFrameForRightEye(&rightEyeFrame) != S_OK) {
-        LOG(INFO) << "Error getting right eye frame";
-      }
-
-      LOG(DEBUG) << "(" << std::this_thread::get_id()
-                  << ") Right frame received (" << _frameCount
-                  << ") " << rightEyeFrame->GetRowBytes() * rightEyeFrame->GetHeight()
-                  << " bytes, " << rightEyeFrame->GetWidth()
-                  << " x " << rightEyeFrame->GetHeight();
-
-      //rightEyeFrame->AddRef();
-      frameVector.push_back( rightEyeFrame );
-
-      // The AddRef will ensure the frame is valid after the end of the callback.
-      // std::thread t = processInThread( rightEyeFrame, 1 );
-      // t.detach();
-    }
+    // std::thread t = processInThread( rightEyeFrame, 1 );
+    // t.detach();
+  }
 
 
   std::thread t = std::thread([=] { process(frameVector); });
@@ -314,12 +358,14 @@ HRESULT InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame* videoFram
     _deckLinkInput->PauseStreams();
 
     LOG(INFO) << "Enabling input at new resolution";
-    enable( mode->GetDisplayMode(), true, formatFlags & bmdDetectedVideoInputDualStream3D );
+    enable( mode->GetDisplayMode(), true, _currentConfig.do3D() );
+
+    //formatFlags & bmdDetectedVideoInputDualStream3D );
 
     _queue.flush();
 
     _currentConfig.setMode( mode->GetDisplayMode() );
-    _currentConfig.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
+    //_currentConfig.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
 
     LOG(INFO) << "Enabling output at new mode";
 

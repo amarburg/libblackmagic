@@ -80,6 +80,7 @@ namespace libblackmagic {
     IDeckLink *_deckLink;
 
     IDeckLinkInput *_deckLinkInput;
+    IDeckLinkConfiguration *_dlConfiguration;
 
     // == input member related variables ==
     MatVector _grabbedImages;

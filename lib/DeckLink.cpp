@@ -184,7 +184,26 @@ namespace libblackmagic {
         int64_t value = 0;
         if( profileAttributes->GetInt( BMDDeckLinkProfileID, &value ) == S_OK ) {
 
-          LOG(INFO) << "Has profile ID: " << value;
+          string profileStr = "(unknown)";
+          switch( value ) {
+            case bmdProfileOneSubDeviceFullDuplex:
+                profileStr = "bmdProfileOneSubDeviceFullDuplex";
+                break;
+            case bmdProfileOneSubDeviceHalfDuplex:
+                profileStr = "bmdProfileOneSubDeviceHalfDuplex";
+                break;
+            case bmdProfileTwoSubDevicesFullDuplex:
+                profileStr = "bmdProfileTwoSubDevicesFullDuplex";
+                break;
+            case bmdProfileTwoSubDevicesHalfDuplex:
+                profileStr = "bmdProfileTwoSubDevicesHalfDuplex";
+                break;
+            case bmdProfileFourSubDevicesHalfDuplex:
+                profileStr = "bmdProfileFourSubDevicesHalfDuplex";
+                break;
+          }
+
+          LOG(INFO) << "Has profile " << profileStr << " (0x" << std::hex << value << ")";
 
         } else {
           LOG(WARNING) << "Unable to query profile ID";
