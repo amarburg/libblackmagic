@@ -51,10 +51,11 @@ namespace libblackmagic {
 	  BMDDisplayMode actualMode;
 		bool isSupported = false;
 
-		if( do3D ) {
-			LOG(INFO) << "  Configuring output for 3D";
-			outputFlags |= bmdVideoOutputDualStream3D;
-		}
+		// At present, output 3D is not required...
+		// if( do3D ) {
+		// 	LOG(INFO) << "  Configuring output for 3D";
+		// 	outputFlags |= bmdVideoOutputDualStream3D;
+		// }
 
 		result = deckLinkOutput()->DoesSupportVideoMode( bmdVideoConnectionSDI, mode,
 																										bmdFormat10BitYUV, outputFlags,

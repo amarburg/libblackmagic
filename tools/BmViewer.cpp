@@ -40,6 +40,9 @@ const int CamNum = 1;
 
 static void processKbInput( char c, DeckLink &decklink ) {
 
+	static uint8_t currentGain = 0x1;
+	static uint32_t currentExposure = 0;  // Start at 1/60
+
 	shared_ptr<SharedBMSDIBuffer> sdiBuffer( decklink.output().sdiProtocolBuffer() );
 
 	SDIBufferGuard guard( sdiBuffer );
@@ -74,23 +77,42 @@ static void processKbInput( char c, DeckLink &decklink ) {
  					break;
 
 			//=== Shutter increment/decrement ===
+
+			// case '.':
+			// 		currentExposure -= 1000;
+			// 		if( currentExposure < 2000 ) currentExposure = 2000;
+			// 		LOG(INFO) << "Setting shutter to " << currentExposure << " us";
+			// 		guard( []( BMSDIBuffer *buffer ){	bmAddExposureMicroseconds( buffer, CamNum, currentExposure ); });
+ 			// 		break;
+ 			// case '/':
+			// 		currentExposure += 1000;
+			// 		if( currentExposure > 42000 ) currentExposure = 42000;
+			// 		LOG(INFO) << "Setting shutter to " << currentExposure << " us";
+			// 		guard( []( BMSDIBuffer *buffer ){	bmAddExposureMicroseconds( buffer, CamNum, currentExposure ); });
+			// 		break;
+
 			case '.':
- 					LOG(INFO) << "Sending shutter increment to camera";
-					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalShutterOffset( buffer, CamNum, 1 ); });
+					if( currentExposure > 0 ) currentExposure--;
+					LOG(INFO) << "Setting exposure to " << currentExposure << "";
+					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalExposure( buffer, CamNum, currentExposure ); });
  					break;
  			case '/':
- 					LOG(INFO) << "Sending shutter decrement to camera";
-					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalShutterOffset( buffer, CamNum, -1 ); });
- 					break;
+					currentExposure++;
+					LOG(INFO) << "Setting exposure to " << currentExposure << " us";
+					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalExposure( buffer, CamNum, currentExposure ); });
+					break;
 
 			//=== Gain increment/decrement ===
 			case 'z':
- 					LOG(INFO) << "Sending gain increment to camera";
-					guard( []( BMSDIBuffer *buffer ){	bmAddSensorGainOffset( buffer, CamNum, 1 ); });
+					currentGain <<= 1;
+					if( currentGain > 16 ) currentGain = 0x1;
+					LOG(INFO) << "Sending gain ISO " << 100*currentGain << " to camera (" << std::hex << int(currentGain) << ")";
+					guard( []( BMSDIBuffer *buffer ){	bmAddSensorGain( buffer, CamNum, currentGain ); });
  					break;
  			case 'x':
- 					LOG(INFO) << "Sending gain decrement to camera";
-					guard( []( BMSDIBuffer *buffer ){	bmAddSensorGainOffset( buffer, CamNum, -1 ); });
+					currentGain = (currentGain > 1) ? currentGain >> 1 : 0x10;
+ 					LOG(INFO) << "Sending gain ISO " << 100*currentGain << " to camera (" << std::hex << int(currentGain) << ")";
+					guard( []( BMSDIBuffer *buffer ){	bmAddSensorGain( buffer, CamNum, currentGain ); });
  					break;
 
 			//== Increment/decrement white balance
@@ -150,7 +172,7 @@ int main( int argc, char** argv )
 	app.add_flag("--no-auto-mode", skipAutoConfig, "Don't do auto mode detection");
 
 	bool skipConfigCamera = false;
-	app.add_flag("--no-config-camera,-c", skipConfigCamera, "Skip sending config info to cameras");
+	app.add_flag("--no-config-camera", skipConfigCamera, "Skip sending config info to cameras");
 
 	bool doListCards = false;
 	app.add_flag("--list-cards", doListCards, "List Decklink cards in the system then exit");
@@ -252,9 +274,11 @@ int main( int argc, char** argv )
 		SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
 		guard( [mode]( BMSDIBuffer *buffer ) {
 
-			bmAddOrdinalAperture( buffer, CamNum, 0 );
-			//bmAddSensorGain( buffer, CamNum, 8 );
+			bmAddAutoExposureMode( buffer, CamNum, BM_AUTOEXPOSURE_SHUTTER );
+			//bmAddOrdinalAperture( buffer, CamNum, 0 );
+			//bmAddSensorGain( buffer, CamNum, 0 );
 			bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
+
 			//bmAddAutoWhiteBalance( buffer, CamNum );
 
 			if(mode != bmdModeDetect) {
