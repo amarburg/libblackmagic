@@ -132,11 +132,13 @@ int main( int argc, char** argv )
 
 	CLI::App app{"Simple BlackMagic camera viewer."};
 
+	const int cardNum = 0;
+
 	int verbosity = 0;
 	app.add_flag("-v", verbosity, "Additional output (use -vv for even more!)");
 
 	bool do3D = false;
-	app.add_flag("--do-3d",do3D, "Enable 3D modes");
+	app.add_flag("-d,--do-3d",do3D, "Enable 3D modes");
 
 	bool noDisplay = false;
 	app.add_flag("--no-display,-x", noDisplay, "Disable display");
@@ -158,13 +160,23 @@ int main( int argc, char** argv )
 
 	CLI11_PARSE(app, argc, argv);
 
+	// Must be showing INFO to the console for either of these modes to show
+	// anything
+	if( doListCards || doListInputModes ) verbosity = std::max(1,verbosity);
+
 	switch(verbosity) {
 		case 1:
-			logger.stderrHandle->call( &ColorStderrSink::setThreshold, INFO );
+			logger.setLevel( INFO );
 			break;
 		case 2:
-			logger.stderrHandle->call( &ColorStderrSink::setThreshold, DEBUG );
+			logger.setLevel( DEBUG );
 			break;
+	}
+
+	// Handle the one-off commands
+	if( doListCards ) {
+			if(doListCards) DeckLink::ListCards();
+			return 0;
 	}
 
 
@@ -178,12 +190,10 @@ int main( int argc, char** argv )
 	cout << "   z x     Adjust sensor gain" << endl;
 	cout << "    s      Cycle through reference sources" << endl;
 
-	DeckLink deckLink;
+	DeckLink deckLink( cardNum );
 
-	// Handle the one-off commands
-	if( doListCards || doListInputModes ) {
-			if(doListCards) deckLink.listCards();
-			if(doListInputModes) deckLink.listInputModes();
+	if( doListInputModes ) {
+		if(doListInputModes) deckLink.listInputModes();
 		return 0;
 	}
 
@@ -217,6 +227,8 @@ int main( int argc, char** argv )
 			LOG(WARNING) << "Unable to start streams";
 			exit(-1);
 	}
+
+	LOG(INFO) << "Streams started!";
 
 
 	if ( doConfigCamera ) {

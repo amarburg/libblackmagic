@@ -9,7 +9,7 @@
 #include <opencv2/highgui/highgui.hpp>
 
 #include "active_object/bounded_shared_queue.h"
-#include "DeckLinkAPI_Version.h"
+#include "DeckLinkAPI.h"
 
 #include "ThreadSynchronizer.h"
 

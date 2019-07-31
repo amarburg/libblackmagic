@@ -1,6 +1,6 @@
 #pragma once
 
-#include "DeckLinkAPI_Version.h"
+#include "DeckLinkAPI.h"
 
 namespace libblackmagic {
 

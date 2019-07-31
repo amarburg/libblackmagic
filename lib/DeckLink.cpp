@@ -1,7 +1,8 @@
 
 #include <string>
 
-#include "libblackmagic/DeckLinkAPI_Version.h"
+#include "libblackmagic/DeckLinkAPI.h"
+#include <DeckLinkAPIVersion.h>
 
 #include "g3log/loglevels.hpp"
 #include "libg3logger/g3logger.h"
@@ -14,7 +15,7 @@ namespace libblackmagic {
   using namespace active_object;
 
   DeckLink::DeckLink( int cardNo )
-  : _deckLink( createDeckLink( cardNo ) ),
+  : _deckLink( CreateDeckLink( cardNo ) ),
     //_configuration( nullptr ),
     _inputHandler( nullptr  ),
     _outputHandler( nullptr ),
@@ -50,12 +51,13 @@ namespace libblackmagic {
   }
 
 
-  void DeckLink::listCards() {
+  void DeckLink::ListCards() {
     IDeckLink *dl = nullptr;
     IDeckLinkIterator *deckLinkIterator = CreateDeckLinkIteratorInstance();
 
     int i = 0;
     while( (deckLinkIterator->Next(&dl)) == S_OK ) {
+
       const char *modelName=NULL, *displayName=NULL;
       if( dl->GetModelName( &modelName ) != S_OK ) {
         LOG(WARNING) << "Unable to query model name.";
@@ -136,9 +138,9 @@ namespace libblackmagic {
 
   //=================================================================
   // Configuration functions
-  IDeckLink *DeckLink::createDeckLink( int cardNo )
+  IDeckLink *DeckLink::CreateDeckLink( int cardNo )
   {
-    //LOG(INFO) << "Using Decklink API  " << BLACKMAGIC_DECKLINK_API_VERSION_STRING;
+    LOG(DEBUG) << "Using Decklink API  " << BLACKMAGIC_DECKLINK_API_VERSION_STRING;
     //
     // if( _deckLink ) {
     //   _deckLink->Release();
@@ -168,6 +170,31 @@ namespace libblackmagic {
 
     if( deckLink->GetDisplayName( (const char **)&displayName ) != S_OK ) {
       LOG(WARNING) << "Unable to query display name.";
+    }
+
+    // == Board-specific configuration ==
+
+    {
+      IDeckLinkProfileAttributes *profileAttributes = nullptr;
+
+      // Get the input (capture) interface of the DeckLink device
+      auto result = deckLink->QueryInterface(IID_IDeckLinkProfileAttributes, (void**)&profileAttributes);
+      if (result == S_OK) {
+
+        int64_t value = 0;
+        if( profileAttributes->GetInt( BMDDeckLinkProfileID, &value ) == S_OK ) {
+
+          LOG(INFO) << "Has profile ID: " << value;
+
+        } else {
+          LOG(WARNING) << "Unable to query profile ID";
+        }
+
+      } else {
+        LOG(WARNING) << "Couldn't get profileAttributes for DeckLink";
+      }
+
+      profileAttributes->Release();
     }
 
     //LOG(INFO) << "Using card " << cardNo << " model name: " << modelName << "; display name: " << displayName;

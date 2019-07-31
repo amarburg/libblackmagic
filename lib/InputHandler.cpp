@@ -55,7 +55,7 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
     // Hardcode some parameters for now
     BMDVideoInputFlags inputFlags = bmdVideoInputFlagDefault;
     //BMDPixelFormat pixelFormat = _pix;
-
+    BMDSupportedVideoModeFlags supportedFlags = bmdSupportedVideoModeDefault;
     IDeckLinkAttributes_v10_11 *deckLinkAttributes = NULL;
     bool formatDetectionSupported;
 
@@ -81,16 +81,27 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
       }
     }
 
-    if( do3D ) inputFlags |= bmdVideoInputDualStream3D;
+    //if( do3D ) inputFlags |= bmdVideoInputDualStream3D;
+    if( do3D ) supportedFlags |= bmdSupportedVideoModeDualStream3D;
 
-    // WHy iterate?  Just ask!
-    BMDSupportedVideoModeFlags displayModeSupported;
+    // Why iterate?  Just ask!
+    // BMDSupportedVideoModeFlags displayModeSupported;
     bool isSupported = false;
     result = _deckLinkInput->DoesSupportVideoMode(bmdVideoConnectionSDI,
                                                     mode,
                                                     _pixelFormat,
-                                                    inputFlags,
+                                                    supportedFlags,
                                                     &isSupported );
+
+    if( isSupported == false ) {
+      LOG(WARNING) << "Requested mode is not supported (result = " << std::hex << result << ")";
+      return false;
+    }
+
+    if( result != S_OK ) {
+      LOG(WARNING) << "Error while checking if DeckLinkInput supports mode (result = " << result << ")";
+      return false;
+    }
 
 
     IDeckLinkDisplayMode *displayMode = nullptr;
@@ -99,15 +110,10 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
 			return false;
 		}
 
-    if( result != S_OK ) {
-      LOG(WARNING) << "Error while checking if DeckLinkInput supports mode";
-      return false;
-    }
-
-    if( displayModeSupported == bmdDisplayModeNotSupported_v10_11 ) {
-      LOG(WARNING) <<  "The display mode is not supported with the selected pixel format on this input";
-      return false;
-    }
+    // if( displayModeSupported == bmdDisplayModeNotSupported_v10_11 ) {
+    //   LOG(WARNING) <<  "The display mode is not supported with the selected pixel format on this input";
+    //   return false;
+    // }
 
     CHECK( displayMode != nullptr ) << "Unable to find a video input mode with the desired properties";
 

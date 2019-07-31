@@ -2,7 +2,7 @@
 
 #include <atomic>
 
-#include "DeckLinkAPI_Version.h"
+#include "DeckLinkAPI.h"
 
 #include "active_object/active.h"
 
@@ -37,7 +37,8 @@ namespace libblackmagic {
     // bool  createVideoInput( const BMDDisplayMode desiredMode = bmdModeHD1080p2997 );
     // bool createVideoOutput( const BMDDisplayMode desiredMode = bmdModeHD1080p2997 );
 
-    void listCards();
+    static void ListCards();
+
     void listInputModes();
 
     // InputConfig config() { return _config; }
@@ -60,7 +61,7 @@ namespace libblackmagic {
 
   protected:
 
-    IDeckLink *createDeckLink( int cardNo );
+    static IDeckLink *CreateDeckLink( int cardNo );
 
     // Responders to public API
     void inputFormatChanged( BMDDisplayMode newMode );

@@ -1,5 +1,5 @@
 
-#include "libblackmagic/DeckLinkAPI_Version.h"
+#include "libblackmagic/DeckLinkAPI.h"
 
 #include <g3log/g3log.hpp>
 

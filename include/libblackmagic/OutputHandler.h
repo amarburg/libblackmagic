@@ -2,7 +2,7 @@
 
 #include <memory>
 
-#include "DeckLinkAPI_Version.h"
+#include "DeckLinkAPI.h"
 #include <active_object/active.h>
 
 #include "SDICameraControl.h"
