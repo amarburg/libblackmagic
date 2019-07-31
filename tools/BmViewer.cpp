@@ -161,6 +161,9 @@ int main( int argc, char** argv )
 	int stopAfter = -1;
 	app.add_option("--stop-after", stopAfter, "Stop after N frames");
 
+	float scale = 1.0;
+	app.add_option("--scale", scale, "Scale");
+
 	CLI11_PARSE(app, argc, argv);
 
 	// Must be showing INFO to the console for either of these modes to show
@@ -269,11 +272,22 @@ int main( int argc, char** argv )
 		std::chrono::steady_clock::time_point loopStart( std::chrono::steady_clock::now() );
 		//if( (duration > 0) && (loopStart > end) ) { keepGoing = false;  break; }
 
-		InputHandler::MatVector images;
-		if( !deckLink.input().queue().wait_for_pop( images, std::chrono::milliseconds(100) ) ) {
+		InputHandler::MatVector rawImages, images;
+		if( !deckLink.input().queue().wait_for_pop( rawImages, std::chrono::milliseconds(100) ) ) {
 			//
 			++miss;
 			continue;
+		}
+
+		if( scale == 1.0 ) {
+			images = rawImages;
+		} else {
+			std::transform( rawImages.begin(), rawImages.end(), back_inserter(images),
+											[scale]( const cv::Mat &input ) -> cv::Mat {
+														cv::Mat output;
+														cv::resize( input, output, cv::Size(), scale, scale);
+														return output; }
+										);
 		}
 
 		if( !noDisplay ) {
@@ -285,7 +299,7 @@ int main( int argc, char** argv )
 			} else if ( numImages == 2 ) {
 
 				cv::Mat composite( cv::Size( images[0].size().width + images[0].size().width,
-				std::max(images[0].size().height, images[1].size().height )), images[0].type() );
+														std::max(images[0].size().height, images[1].size().height )), images[0].type() );
 
 				if( !images[0].empty() ) {
 					cv::Mat leftROI( composite, cv::Rect(0,0,images[0].size().width,images[0].size().height) );

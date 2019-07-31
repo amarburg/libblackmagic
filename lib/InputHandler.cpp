@@ -72,6 +72,7 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
       return false;
     }
 
+    //
     if( doAuto ) {
       LOG(INFO) << "Automatic mode detection requested";
 
@@ -86,6 +87,7 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
       }
     }
 
+    //
     if( do3D ) {
       LOG(INFO) << "Configured input for 3D";
       supportedFlags |= bmdSupportedVideoModeDualStream3D;
@@ -94,41 +96,20 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
       //== Configure bmdDeckLinkConfigSDIInput3DPayloadOverride
       //  If set to true, the device will capture two genlocked SDI streams
       //  with matching video modes as a 3D stream.
-      {
-        // IDeckLinkConfiguration *dlConfiguration = NULL;
-        // // Check the card supports format detection
-        // auto result = _deckLink->QueryInterface(IID_IDeckLinkConfiguration, (void**)&dlConfiguration);
-        // if (result == S_OK) {
-
-          CHECK( _dlConfiguration != nullptr ) << "_dlConfiguration is nullptr";
-
-          bool input3DPayloadOverride = false;
-          if( _dlConfiguration->GetFlag(bmdDeckLinkConfigSDIInput3DPayloadOverride, &input3DPayloadOverride) != S_OK ) {
-            LOG(WARNING) << "Unable to query bmdDeckLinkConfigSDIInput3DPayloadOverride";
-          }
-          LOG(INFO) << "  before setting, bmdDeckLinkConfigSDIInput3DPayloadOverride is " << (input3DPayloadOverride ? "true" : "false");
-
-          if( _dlConfiguration->SetFlag( bmdDeckLinkConfigSDIInput3DPayloadOverride, true ) != S_OK ) {
-            LOG(WARNING) << "Unable to set bmdDeckLinkConfigSDIInput3DPayloadOverride";
-          }
-
-          if( _dlConfiguration->GetFlag(bmdDeckLinkConfigSDIInput3DPayloadOverride, &input3DPayloadOverride) != S_OK ) {
-            LOG(WARNING) << "Unable to query bmdDeckLinkConfigSDIInput3DPayloadOverride";
-          }
-          LOG(INFO) << "  after setting, bmdDeckLinkConfigSDIInput3DPayloadOverride is " << (input3DPayloadOverride ? "true" : "false");
-        //
-        // } else {
-        //   LOG(WARNING) << "Unable to query dlConfiguration";
-        //   return false;
-        // }
-        //
-        // dlConfiguration->Release();
+      if( _dlConfiguration->SetFlag( bmdDeckLinkConfigSDIInput3DPayloadOverride, true ) != S_OK ) {
+        LOG(WARNING) << "Unable to set bmdDeckLinkConfigSDIInput3DPayloadOverride";
       }
 
+      {
+        bool input3DPayloadOverride = false;
+        if( _dlConfiguration->GetFlag(bmdDeckLinkConfigSDIInput3DPayloadOverride, &input3DPayloadOverride) != S_OK ) {
+          LOG(WARNING) << "Unable to query bmdDeckLinkConfigSDIInput3DPayloadOverride";
+        }
+        LOG(INFO) << "  after setting, bmdDeckLinkConfigSDIInput3DPayloadOverride is " << (input3DPayloadOverride ? "true" : "false");
+      }
     }
 
-    // Why iterate?  Just ask!
-    // BMDSupportedVideoModeFlags displayModeSupported;
+    // Check if desired mode and flags are supported
     bool isSupported = false;
     result = _deckLinkInput->DoesSupportVideoMode(bmdVideoConnectionSDI,
                                                     mode,
@@ -146,30 +127,30 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
       return false;
     }
 
-    IDeckLinkDisplayMode *displayMode = nullptr;
-		if( _deckLinkInput->GetDisplayMode( mode, &displayMode ) != S_OK ) {
-			LOG(WARNING) << "Unable to get display mode";
-			return false;
-		}
+    // Display some info about that mode
+    {
+      IDeckLinkDisplayMode *displayMode = nullptr;
+  		if( _deckLinkInput->GetDisplayMode( mode, &displayMode ) != S_OK ) {
+  			LOG(WARNING) << "Unable to get display mode";
+  			return false;
+  		}
 
-    // if( displayModeSupported == bmdDisplayModeNotSupported_v10_11 ) {
-    //   LOG(WARNING) <<  "The display mode is not supported with the selected pixel format on this input";
-    //   return false;
-    // }
+      CHECK( displayMode != nullptr ) << "Unable to find a video input mode with the desired properties";
+      LOG(INFO) << "Enabling video input with mode " << displayModeToString(displayMode->GetDisplayMode())
+                << ( (displayMode->GetFlags() & bmdDisplayModeSupports3D) ? " 3D" : "")
+                << " and pixel format " << pixelFormatToString( _pixelFormat );
 
-    CHECK( displayMode != nullptr ) << "Unable to find a video input mode with the desired properties";
+      displayMode->Release();
+    }
 
+
+
+    // Enable that mode
     _deckLinkInput->SetCallback(this);
     _deckLinkInput->DisableAudioInput();
 
-    const auto flags = displayMode->GetFlags();
-
-    LOG(INFO) << "Enabling video input with mode " << displayModeToString(displayMode->GetDisplayMode())
-              << ( (flags & bmdDisplayModeSupports3D) ? " 3D" : "")
-              << " and pixel format " << pixelFormatToString( _pixelFormat );
-
     // Made it this far?  Great!
-    if( S_OK != _deckLinkInput->EnableVideoInput(displayMode->GetDisplayMode(),
+    if( S_OK != _deckLinkInput->EnableVideoInput(mode,
                                                   _pixelFormat,
                                                   inputFlags ) ) {
         LOG(WARNING) << "Failed to enable video input. Is another application using the card?";
@@ -179,10 +160,8 @@ bool InputHandler::enable( BMDDisplayMode mode, bool doAuto, bool do3D ) {
     LOG(INFO) << "DeckLinkInput enabled!";
 
     // Update config with values
-    _currentConfig.setMode( displayMode->GetDisplayMode() );
-    _currentConfig.set3D( flags & bmdDisplayModeSupports3D );
-
-    displayMode->Release();
+    _currentConfig.setMode( mode );
+    _currentConfig.set3D( inputFlags & bmdVideoInputDualStream3D );
 
     _enabled = true;
     return true;
