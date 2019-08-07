@@ -168,8 +168,8 @@ int main( int argc, char** argv )
 	string desiredModeString = "1080p2997";
 	app.add_option("--mode,-m", desiredModeString, "Desired mode");
 
-	bool skipAutoConfig = false;
-	app.add_flag("--no-auto-mode", skipAutoConfig, "Don't do auto mode detection");
+	bool skipAutoDetect = false;
+	app.add_flag("--no-auto-mode", skipAutoDetect, "Don't do auto mode detection");
 
 	bool skipConfigCamera = false;
 	app.add_flag("--no-config-camera", skipConfigCamera, "Skip sending config info to cameras");
@@ -236,8 +236,8 @@ int main( int argc, char** argv )
 		LOG(WARNING) << "Setting initial mode " << desiredModeString;
 	}
 
-	const bool doAutoConfig = !skipAutoConfig;
-	if( !deckLink.input().enable( mode, doAutoConfig, do3D ) ) {
+	const bool doAutoDetect = !skipAutoDetect;
+	if( !deckLink.input().enable( mode, doAutoDetect, do3D ) ) {
 		LOG(WARNING) << "Failed to enable input";
 		return -1;
 	}
@@ -266,27 +266,47 @@ int main( int argc, char** argv )
 
 	LOG(INFO) << "Streams started!";
 
+	const bool doConfigCamera = !skipConfigCamera;
+	if ( doConfigCamera ) {
 
-	if ( !skipConfigCamera ) {
-		LOG(INFO) << "Sending configuration to cameras";
+		if( doAutoDetect ) {
 
-		// Be careful not to exceed 255 byte buffer length
-		SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
-		guard( [mode]( BMSDIBuffer *buffer ) {
+			LOG(INFO) << "Deferring configuration until after autoconfig";
 
-			bmAddAutoExposureMode( buffer, CamNum, BM_AUTOEXPOSURE_SHUTTER );
-			//bmAddOrdinalAperture( buffer, CamNum, 0 );
-			//bmAddSensorGain( buffer, CamNum, 0 );
-			bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
+			deckLink.setInputFormatChangedCallback( []( BMDDisplayMode mode ) {
+					LOG(INFO) << "  !! CALLBACK !! ";
 
-			//bmAddAutoWhiteBalance( buffer, CamNum );
+					// SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
+					// guard( [mode]( BMSDIBuffer *buffer ) {
+					// 	if(mode != bmdModeDetect) {
+					// 		LOG(INFO) << "Sending video mode " << displayModeToString( mode ) << " to camera";
+					// 		bmAddVideoMode( buffer, CamNum, mode );
+					// 	}
+					// }
+			});
+		} else {
 
-			if(mode != bmdModeDetect) {
-				LOG(INFO) << "Sending video mode " << displayModeToString( mode ) << " to camera";
-				bmAddVideoMode( buffer, CamNum, mode );
-			}
+			LOG(INFO) << "Sending configuration to cameras";
 
-		});
+			// Be careful not to exceed 255 byte buffer length
+			SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
+			guard( [mode]( BMSDIBuffer *buffer ) {
+
+				bmAddAutoExposureMode( buffer, CamNum, BM_AUTOEXPOSURE_SHUTTER );
+				//bmAddOrdinalAperture( buffer, CamNum, 0 );
+				//bmAddSensorGain( buffer, CamNum, 0 );
+				bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
+
+				//bmAddAutoWhiteBalance( buffer, CamNum );
+
+				if(mode != bmdModeDetect) {
+					LOG(INFO) << "Sending video mode " << displayModeToString( mode ) << " to camera";
+					bmAddVideoMode( buffer, CamNum, mode );
+				}
+
+			});
+
+		}
 	} else {
 		LOG(DEBUG) << " .. _NOT_ sending config info to cameras";
 	}

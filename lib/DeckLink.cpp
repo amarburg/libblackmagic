@@ -19,7 +19,8 @@ namespace libblackmagic {
     //_configuration( nullptr ),
     _inputHandler( nullptr  ),
     _outputHandler( nullptr ),
-    _thread( Active::createActive() )
+    _thread( Active::createActive() ),
+    _onInputFormatChanged( DefaultInputFormatChanged )
   {
     CHECK( _deckLink != nullptr );
 
@@ -234,6 +235,9 @@ namespace libblackmagic {
 
     _outputHandler->disable();
     _outputHandler->enable( newMode );
+
+    // Call the callback
+    _onInputFormatChanged( newMode );
 
     LOG(INFO) << "Restarting streams";
 

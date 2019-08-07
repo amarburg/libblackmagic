@@ -314,52 +314,6 @@ HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFra
   return S_OK;
 }
 
-
-
-// Callback if bmdVideoInputEnableFormatDetection was set when
-// enabling video input
-  HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents events,
-                                              IDeckLinkDisplayMode *mode,
-                                              BMDDetectedVideoInputFormatFlags formatFlags)
-  {
-    LOG(INFO) << "(" << std::this_thread::get_id() << ") Received Video Input Format Changed";
-
-    char*   displayModeName = nullptr;
-    // BMDPixelFormat  pixelFormat = _pixelFormat; //bmdFormat10BitYUV;
-    // if (formatFlags & bmdDetectedVideoInputRGB444) pixelFormat = bmdFormat10BitRGB;
-
-    mode->GetName((const char**)&displayModeName);
-    LOG(INFO) << "Input video format changed to " << displayModeName
-              << ((formatFlags & bmdDetectedVideoInputDualStream3D) ? " with 3D" : " not 3D");
-
-    if (displayModeName) free(displayModeName);
-
-    _deckLinkInput->PauseStreams();
-
-    LOG(INFO) << "Enabling input at new resolution";
-    enable( mode->GetDisplayMode(), true, _currentConfig.do3D() );
-
-    //formatFlags & bmdDetectedVideoInputDualStream3D );
-
-    _queue.flush();
-
-    _currentConfig.setMode( mode->GetDisplayMode() );
-    //_currentConfig.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
-
-    LOG(INFO) << "Enabling output at new mode";
-
-    _deckLinkInput->FlushStreams();
-    _deckLinkInput->StartStreams();
-
-    _parent.sendInputFormatChanged( mode->GetDisplayMode() );
-
-    // And reconfigure output
-    LOG(INFO) << "Restarted streams at new mode " << displayModeToString( mode->GetDisplayMode() );
-
-    return S_OK;
-  }
-
-
   //
   //
   //
@@ -435,5 +389,54 @@ HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFra
     LOG(DEBUG) << frameName << " Release; " << videoFrame->Release() << " references remain";
 
   }
+
+
+//====================
+
+
+
+// Callback if bmdVideoInputEnableFormatDetection was set when
+// enabling video input
+  HRESULT InputHandler::VideoInputFormatChanged(BMDVideoInputFormatChangedEvents events,
+                                              IDeckLinkDisplayMode *mode,
+                                              BMDDetectedVideoInputFormatFlags formatFlags)
+  {
+    LOG(INFO) << "(" << std::this_thread::get_id() << ") Received Video Input Format Changed";
+
+    char*   displayModeName = nullptr;
+    // BMDPixelFormat  pixelFormat = _pixelFormat; //bmdFormat10BitYUV;
+    // if (formatFlags & bmdDetectedVideoInputRGB444) pixelFormat = bmdFormat10BitRGB;
+
+    mode->GetName((const char**)&displayModeName);
+    LOG(INFO) << "Input video format changed to " << displayModeName
+              << ((formatFlags & bmdDetectedVideoInputDualStream3D) ? " with 3D" : " not 3D");
+
+    if (displayModeName) free(displayModeName);
+
+    _deckLinkInput->PauseStreams();
+
+    LOG(INFO) << "Enabling input at new resolution";
+    enable( mode->GetDisplayMode(), true, _currentConfig.do3D() );
+
+    //formatFlags & bmdDetectedVideoInputDualStream3D );
+
+    _queue.flush();
+
+    _currentConfig.setMode( mode->GetDisplayMode() );
+    //_currentConfig.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
+
+    LOG(INFO) << "Enabling output at new mode";
+
+    _deckLinkInput->FlushStreams();
+    _deckLinkInput->StartStreams();
+
+    _parent.sendInputFormatChanged( mode->GetDisplayMode() );
+
+    // And reconfigure output
+    LOG(INFO) << "Restarted streams at new mode " << displayModeToString( mode->GetDisplayMode() );
+
+    return S_OK;
+  }
+
 
 }

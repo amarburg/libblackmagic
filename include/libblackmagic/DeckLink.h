@@ -32,19 +32,10 @@ namespace libblackmagic {
 			_thread->send( std::bind(&DeckLink::inputFormatChanged, this, newMode) );
 	   }
 
-    // Input and output will be created automatically with defaults unless these
-    // functions are called first.
-    // bool  createVideoInput( const BMDDisplayMode desiredMode = bmdModeHD1080p2997 );
-    // bool createVideoOutput( const BMDDisplayMode desiredMode = bmdModeHD1080p2997 );
-
     static void ListCards();
-
     void listInputModes();
 
-    // InputConfig config() { return _config; }
-
     IDeckLink *deckLink() { return _deckLink; }
-    //IDeckLinkConfiguration *configuration();
 
     // These start and stop the input streams
     bool startStreams();
@@ -54,16 +45,15 @@ namespace libblackmagic {
     InputHandler &input()     { return *_inputHandler; }
     OutputHandler &output()   { return *_outputHandler; }
 
-    // // Pull images from _InputHandler
-    // virtual bool grab( void );
-    // virtual int getRawImage( int i, cv::Mat &mat );
-
+    // Set callbacks
+    typedef std::function<void(BMDDisplayMode)> InputFormatChangedCallback;
+    void setInputFormatChangedCallback( InputFormatChangedCallback cb ) { _onInputFormatChanged = cb; }
 
   protected:
 
     static IDeckLink *CreateDeckLink( int cardNo );
 
-    // Responders to public API
+    // Callbacks to public API (runs in thread)
     void inputFormatChanged( BMDDisplayMode newMode );
 
   private:
@@ -80,9 +70,10 @@ namespace libblackmagic {
     InputHandler  *_inputHandler;
     OutputHandler *_outputHandler;
 
-    // InputConfig _config;
-
     std::unique_ptr<active_object::Active> _thread;
+
+    InputFormatChangedCallback _onInputFormatChanged;
+    static void DefaultInputFormatChanged( BMDDisplayMode mode ) {;}
 
   };
 
