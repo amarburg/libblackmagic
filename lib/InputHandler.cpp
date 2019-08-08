@@ -297,14 +297,10 @@ HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFra
 
     //rightEyeFrame->AddRef();
     frameVector.push_back( rightEyeFrame );
-
-    // The AddRef will ensure the frame is valid after the end of the callback.
-    // std::thread t = processInThread( rightEyeFrame, 1 );
-    // t.detach();
   }
 
 
-  std::thread t = std::thread([=] { process(frameVector); });
+  std::thread t = std::thread([=]{ process(frameVector); });
   t.detach();
 
   if (threeDExtensions) threeDExtensions->Release();
@@ -361,7 +357,7 @@ HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFra
 
 
   //
-  //
+  // Takes a vector of one or two Frames.  Converts to Mats and enqueues them.
   //
   void InputHandler::process( FrameVector frameVector )
   {
@@ -373,8 +369,10 @@ HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFra
       workers.push_back( shared_ptr<thread>(new std::thread( &InputHandler::frameToMat, this, frameVector[i], std::ref(out[i]), i )) );
     }
 
+    // Transform the first image in this thread
     frameToMat( frameVector[0], out[0], 0 );
 
+    // Wait for any other threads to finish
     for( auto worker : workers ) worker->join();
 
     _queue.push( out );
@@ -383,7 +381,7 @@ HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFra
 
   void InputHandler::frameToMat( IDeckLinkVideoFrame *videoFrame, cv::Mat &out, int i )
   {
-    CHECK( videoFrame != nullptr ) << "Input VideoFrame in frameToMat";
+    CHECK( videoFrame != nullptr ) << "Input VideoFrame in frameToMat is nullptr";
     //CHECK( out ) << "Output Mat undefined in frameToMat";
 
     std::string frameName( _currentConfig.do3D() ? ((i==1) ? "[RIGHT]" : "[LEFT]") : "" );
@@ -427,12 +425,14 @@ HRESULT InputHandler::VideoInputFrameArrived( IDeckLinkVideoInputFrame* videoFra
 
          dstFrame->Release();
          deckLinkOutput->Release();
+
       }
 
     }
 
     // Regardless of what happens, release the frames
-    LOG(DEBUG) << frameName << " Release; " << videoFrame->Release() << " references remain";
+    auto refs = videoFrame->Release();
+    LOG(DEBUG) << frameName << " Releaseed frame; " << refs << " references remain";
 
   }
 
