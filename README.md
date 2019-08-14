@@ -1,10 +1,12 @@
 # libblackmagic
 
-This library provides an OO-ish interface to the [Blackmagic DeckLink](https://www.blackmagicdesign.com/products/decklink) SDI interface cards.
+This library provides an OO-ish interface to the [Blackmagic DeckLink](https://www.blackmagicdesign.com/products/decklink) SDI interface cards.  I will admit it is closely tuned to my particular needs (capture of mono and stereo video over SDI), and isn't very "generic."
 
-The library build is coordinated with [fips](https://github.com/floooh/fips).
+The build is coordinated with [fips](https://github.com/floooh/fips).
 
-This library has a number of dependencies.  Most of them are handled by fips, but both the [Blackmagic Desktop Video and Desktop Video API](https://www.blackmagicdesign.com/developer/product/capture-and-playback) must be downloaded and installed separately.  The file [cmake/FindBlackmagicSDK.cmake](cmake/FindBlackmagicSDK.cmake) searches for the API ... if needed, the environment variable `BLACKMAGIC_DIR` can be provided as hint.
+This library has a number of dependencies.  Most of them are handled by fips, but both the [Blackmagic Desktop Video and Desktop Video API](https://www.blackmagicdesign.com/developer/product/capture-and-playback) must be downloaded and installed separately.  The file [cmake/FindBlackmagicSDK.cmake](cmake/FindBlackmagicSDK.cmake) searches for the API ... if needed, the environment variable `BLACKMAGIC_DIR` can be provided as hint.  
+
+To add a hint, the user should export the path of the SDK, e.g. export BLACKMAGIC_DIR=<path_to_lackmagic_DeckLink_SDK_11.3>
 
 __We are currently building against Blackmagic API version 11.2__
 
@@ -18,9 +20,7 @@ In general, this can be shortened to:
 
     ./fips build
 
-
-This package builds a single binary, `bm_viewer` which can display video and control the cameras.
-
+This package builds a single binary, `bm_viewer` which can display video and send remote control commands to the camera.
 
 # License
 
