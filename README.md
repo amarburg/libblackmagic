@@ -4,7 +4,9 @@ This library provides an OO-ish interface to the [Blackmagic DeckLink](https://w
 
 The build is coordinated with [fips](https://github.com/floooh/fips).
 
-This library has a number of dependencies.  Most of them are handled by fips, but both the [Blackmagic Desktop Video and Desktop Video API](https://www.blackmagicdesign.com/developer/product/capture-and-playback) must be downloaded and installed separately.  The file [cmake/FindBlackmagicSDK.cmake](cmake/FindBlackmagicSDK.cmake) searches for the API ... if needed, the environment variable `BLACKMAGIC_DIR` can be provided as hint.
+This library has a number of dependencies.  Most of them are handled by fips, but both the [Blackmagic Desktop Video and Desktop Video API](https://www.blackmagicdesign.com/developer/product/capture-and-playback) must be downloaded and installed separately.  The file [cmake/FindBlackmagicSDK.cmake](cmake/FindBlackmagicSDK.cmake) searches for the API ... if needed, the environment variable `BLACKMAGIC_DIR` can be provided as hint.  
+
+To add a hint, the user should export the path of the SDK, e.g. export BLACKMAGIC_DIR=<path_to_lackmagic_DeckLink_SDK_11.3>
 
 __We are currently building against Blackmagic API version 11.2__
 
