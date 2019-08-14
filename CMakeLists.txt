@@ -60,7 +60,7 @@ else()
   
   catkin_package(
     #CATKIN_DEPENDS g3log_catkin
-    INCLUDE_DIRS include
+    INCLUDE_DIRS include ${BLACKMAGIC_INCLUDE_DIR}
     LIBRARIES libblackmagic_LIB
   )
 
@@ -72,13 +72,18 @@ else()
       #${g3log_catkin_INCLUDE_DIRS}
   )
 
+    find_path(BLACKMAGIC_SRCS DeckLinkAPIDispatch.cpp)
+    set(BLACKMAGIC_SRCS ${BLACKMAGIC_SRCS})
+    add_library(blackmagic_lib ${BLACKMAGIC_SRCS})
+    target_link_libraries(blackmagic_lib ${catkin_LIBRARIES})
+
     file(GLOB libblackmagic_SRCS
 	lib/*cpp
       )
 
 
     add_library(libblackmagic_LIB ${libblackmagic_SRCS})
-    target_link_libraries(libblackmagic_LIB ${catkin_LIBRARIES})
+    target_link_libraries(libblackmagic_LIB blackmagic_lib ${catkin_LIBRARIES})
 
 
 
@@ -88,7 +93,7 @@ else()
           RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})
 
     ## Install headers
-    install(DIRECTORY  include/${PROJECT_NAME}/
+    install(DIRECTORY  include/${PROJECT_NAME}/  #${BLACKMAGIC_INCLUDE_DIR}
         DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
         FILES_MATCHING PATTERN "*.hpp" PATTERN "*.h"
         PATTERN ".git" EXCLUDE)
