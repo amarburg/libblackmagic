@@ -252,7 +252,12 @@ int main( int argc, char** argv )
 	}
 
 	// Set up callback
+	//
+	// -- Callback runs in its own thread, and rawImages is a unique copy of the images.
 	client.input().setNewImagesCallback( [&]( const InputHandler::MatVector &rawImages ) {
+
+		// \TODO.  need to make threadsafe...
+		if( !keepGoing ) return;
 
 		LOG(DEBUG) << "In callback";
 
