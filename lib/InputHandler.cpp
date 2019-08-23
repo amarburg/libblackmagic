@@ -317,6 +317,8 @@ InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame *videoFrame,
     frameVector.push_back(rightEyeFrame);
   }
 
+  // \TODO Need to track these threads and wait for them all to finish before
+  // destruction
   std::thread t = std::thread([=] { process(frameVector); });
   t.detach();
 
