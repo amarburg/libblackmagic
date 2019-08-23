@@ -13,39 +13,14 @@
 namespace libblackmagic {
 
 using std::string;
-using namespace active_object;
 
 DeckLink::DeckLink(int cardNo)
-    : _deckLink(CreateDeckLink(cardNo)),
-      //_configuration( nullptr ),
-      _inputHandler(nullptr), _outputHandler(nullptr),
-      _thread(Active::createActive()) {
+    : _deckLink(CreateDeckLink(cardNo))
+{
   CHECK(_deckLink != nullptr);
-
-  _inputHandler = new InputHandler(*this);
-  CHECK(_inputHandler != nullptr);
-
-  _outputHandler = new OutputHandler(*this);
-  CHECK(_outputHandler != nullptr);
 }
 
 DeckLink::~DeckLink() {
-  // if( _deckLinkOutput ) {
-  //   // Disable the video input interface
-  //   _deckLinkOutput->DisableVideoOutput();
-  //   _deckLinkOutput->Release();
-  // }
-  //
-  // if( _deckLinkInput ) {
-  //   _deckLinkInput->StopStreams();
-  //   _deckLinkInput->Release();
-  // }
-
-  if (_inputHandler)
-    delete _inputHandler;
-  if (_outputHandler)
-    delete _outputHandler;
-
   _deckLink->Release();
 }
 
@@ -125,17 +100,6 @@ void DeckLink::listInputModes() {
   input->Release();
 }
 
-// IDeckLinkConfiguration *DeckLink::configuration() {
-//
-//   if( !_configuration ) {
-//     CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkConfiguration,
-//     (void**)&_configuration) )
-//                   << "Could not obtain the IDeckLinkConfiguration interface";
-//     CHECK(_configuration != nullptr );
-//   }
-//
-//   return _configuration;
-// }
 
 //=================================================================
 // Configuration functions
@@ -226,41 +190,6 @@ IDeckLink *DeckLink::CreateDeckLink(int cardNo) {
   free(displayName);
 
   return deckLink;
-}
-
-//== API functions =================================================
-void DeckLink::inputFormatChanged(BMDDisplayMode newMode) {
-  LOG(INFO) << "In inputFormatChanged with mode "
-            << displayModeToString(newMode);
-
-  // Change output mode
-  _outputHandler->stopStreamsWait();
-
-  _outputHandler->disable();
-  _outputHandler->enable(newMode);
-
-  LOG(INFO) << "Restarting streams";
-
-  _outputHandler->startStreams();
-}
-
-//=================================================================
-
-bool DeckLink::startStreams(void) {
-
-  // TODO.  Check responses
-  if (!_outputHandler->startStreams())
-    return false;
-  if (!_inputHandler->startStreams())
-    return false;
-  ;
-
-  return true;
-}
-
-void DeckLink::stopStreams(void) {
-  _inputHandler->stopStreams();
-  _outputHandler->stopStreams();
 }
 
 } // namespace libblackmagic

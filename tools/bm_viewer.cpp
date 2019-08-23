@@ -1,6 +1,8 @@
 
 // TODO:   Reduce the DRY
 
+#include <unistd.h>
+
 #include <string>
 #include <thread>
 using namespace std;
@@ -11,14 +13,17 @@ using namespace std;
 
 #include <libg3logger/g3logger.h>
 
-#include "libblackmagic/DeckLink.h"
+#include "libblackmagic/InputOutputClient.h"
 #include "libblackmagic/DataTypes.h"
 using namespace libblackmagic;
 
 #include "libbmsdi/helpers.h"
 
-bool keepGoing = true;
+// Global configuration
+const int CamNum = 1;
 
+// Global state variables
+bool keepGoing = true;
 
 void signal_handler( int sig )
 {
@@ -34,16 +39,15 @@ void signal_handler( int sig )
 	}
 }
 
-const int CamNum = 1;
 
 
 
-static void processKbInput( char c, DeckLink &decklink ) {
+static void processKbInput( char c, InputOutputClient &client ) {
 
 	static uint8_t currentGain = 0x1;
 	static uint32_t currentExposure = 0;  // Start at 1/60
 
-	shared_ptr<SharedBMSDIBuffer> sdiBuffer( decklink.output().sdiProtocolBuffer() );
+	shared_ptr<SharedBMSDIBuffer> sdiBuffer( client.output().sdiProtocolBuffer() );
 
 	SDIBufferGuard guard( sdiBuffer );
 
@@ -148,7 +152,7 @@ using cv::Mat;
 
 int main( int argc, char** argv )
 {
-	libg3logger::G3Logger logger("bmRecorder");
+	libg3logger::G3Logger logger("bm_viewer");
 
 	signal( SIGINT, signal_handler );
 
@@ -203,8 +207,8 @@ int main( int argc, char** argv )
 
 	// Handle the one-off commands
 	if( doListCards ) {
-			if(doListCards) DeckLink::ListCards();
-			return 0;
+		DeckLink::ListCards();
+		return 0;
 	}
 
 
@@ -218,12 +222,14 @@ int main( int argc, char** argv )
 	cout << "   z x     Adjust sensor gain" << endl;
 	cout << "    s      Cycle through reference sources" << endl;
 
-	DeckLink deckLink( cardNum );
 
 	if( doListInputModes ) {
-		if(doListInputModes) deckLink.listInputModes();
+		DeckLink deckLink( cardNum );
+		deckLink.listInputModes();
 		return 0;
 	}
+
+	InputOutputClient client( cardNum );
 
 	BMDDisplayMode mode = stringToDisplayMode( desiredModeString );
 	if( mode == bmdModeUnknown ) {
@@ -236,72 +242,12 @@ int main( int argc, char** argv )
 		LOG(WARNING) << "Setting initial mode " << desiredModeString;
 	}
 
-	const bool doAutoConfig = !skipAutoConfig;
-	if( !deckLink.input().enable( mode, doAutoConfig, do3D ) ) {
-		LOG(WARNING) << "Failed to enable input";
-		return -1;
-	}
-
-	if( !deckLink.output().enable( mode, false ) ) {
-		LOG(WARNING) << "Failed to enable output";
-		return -1;
-	}
-
-	// Need to wait for initialization
-//	if( decklink.initializedSync.wait_for( std::chrono::seconds(1) ) == false || !decklink.initialized() ) {
-	// if( !decklink.initialize() ) {
-	// 	LOG(WARNING) << "Unable to initialize DeckLink";
-	// 	exit(-1);
-	// }
-
-	// std::chrono::steady_clock::time_point start( std::chrono::steady_clock::now() );
-	// std::chrono::steady_clock::time_point end( start + std::chrono::seconds( duration ) );
-
 	int count = 0, miss = 0, displayed = 0;
 
-	if( !deckLink.startStreams() ) {
-			LOG(WARNING) << "Unable to start streams";
-			exit(-1);
-	}
+	// Set up callback
+	client.input().setNewImagesCallback( [&]( const InputHandler::MatVector &rawImages ) {
 
-	LOG(INFO) << "Streams started!";
-
-
-	if ( !skipConfigCamera ) {
-		LOG(INFO) << "Sending configuration to cameras";
-
-		// Be careful not to exceed 255 byte buffer length
-		SDIBufferGuard guard( deckLink.output().sdiProtocolBuffer() );
-		guard( [mode]( BMSDIBuffer *buffer ) {
-
-			bmAddAutoExposureMode( buffer, CamNum, BM_AUTOEXPOSURE_SHUTTER );
-			//bmAddOrdinalAperture( buffer, CamNum, 0 );
-			//bmAddSensorGain( buffer, CamNum, 0 );
-			bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
-
-			//bmAddAutoWhiteBalance( buffer, CamNum );
-
-			if(mode != bmdModeDetect) {
-				LOG(INFO) << "Sending video mode " << displayModeToString( mode ) << " to camera";
-				bmAddVideoMode( buffer, CamNum, mode );
-			}
-
-		});
-	} else {
-		LOG(DEBUG) << " .. _NOT_ sending config info to cameras";
-	}
-
-	while( keepGoing ) {
-
-		std::chrono::steady_clock::time_point loopStart( std::chrono::steady_clock::now() );
-		//if( (duration > 0) && (loopStart > end) ) { keepGoing = false;  break; }
-
-		InputHandler::MatVector rawImages, images;
-		if( !deckLink.input().queue().wait_for_pop( rawImages, std::chrono::milliseconds(100) ) ) {
-			//
-			++miss;
-			continue;
-		}
+		InputHandler::MatVector  images;
 
 		if( scale == 1.0 ) {
 			images = rawImages;
@@ -340,17 +286,69 @@ int main( int argc, char** argv )
 			}
 
 			LOG_IF(INFO, (displayed % 50) == 0) << "Frame #" << displayed;
-			char c = cv::waitKey(1);
-
 			++displayed;
 
-			// Take action on character
-			processKbInput( c, deckLink );
+			char c = cv::waitKey(1);
+			processKbInput( c, client );
 		}
 
 		++count;
 
 		if((stopAfter > 0) && (count >= stopAfter)) keepGoing = false;
+
+	});
+
+
+
+	const bool doAutoConfig = !skipAutoConfig;
+	if( !client.input().enable( mode, doAutoConfig, do3D ) ) {
+		LOG(WARNING) << "Failed to enable input";
+		return -1;
+	}
+
+	if( !client.output().enable( mode, false ) ) {
+		LOG(WARNING) << "Failed to enable output";
+		return -1;
+	}
+
+	if( !client.startStreams() ) {
+			LOG(WARNING) << "Unable to start streams";
+			exit(-1);
+	}
+
+	LOG(INFO) << "Streams started!";
+
+
+	if ( !skipConfigCamera ) {
+		LOG(INFO) << "Sending configuration to cameras";
+
+		// Be careful not to exceed 255 byte buffer length
+		SDIBufferGuard guard( client.output().sdiProtocolBuffer() );
+		guard( [mode]( BMSDIBuffer *buffer ) {
+
+			bmAddAutoExposureMode( buffer, CamNum, BM_AUTOEXPOSURE_SHUTTER );
+			//bmAddOrdinalAperture( buffer, CamNum, 0 );
+			//bmAddSensorGain( buffer, CamNum, 0 );
+			bmAddReferenceSource( buffer, CamNum, BM_REF_SOURCE_PROGRAM );
+
+			//bmAddAutoWhiteBalance( buffer, CamNum );
+
+			if(mode != bmdModeDetect) {
+				LOG(INFO) << "Sending video mode " << displayModeToString( mode ) << " to camera";
+				bmAddVideoMode( buffer, CamNum, mode );
+			}
+
+		});
+	} else {
+		LOG(DEBUG) << " .. _NOT_ sending config info to cameras";
+	}
+
+	while( keepGoing ) {
+
+		std::chrono::steady_clock::time_point loopStart( std::chrono::steady_clock::now() );
+		//if( (duration > 0) && (loopStart > end) ) { keepGoing = false;  break; }
+
+		usleep(100000);
 
 	}
 
@@ -358,7 +356,7 @@ int main( int argc, char** argv )
 
 	LOG(INFO) << "End of main loop, stopping streams...";
 
-	deckLink.stopStreams();
+	client.stopStreams();
 
 
 	// LOG(INFO) << "Recorded " << count << " frames in " <<   dur.count();

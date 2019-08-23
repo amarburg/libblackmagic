@@ -3,43 +3,59 @@
 
 #include <g3log/g3log.hpp>
 
+#include "libblackmagic/DataTypes.h"
 #include "libblackmagic/SDICameraControl.h"
 #include "libblackmagic/OutputHandler.h"
 #include "libblackmagic/DeckLink.h"
 
 namespace libblackmagic {
 
-	OutputHandler::OutputHandler( DeckLink &parent )
+	OutputHandler::OutputHandler( DeckLink &deckLink )
 			:  _scheduledPlaybackStoppedCond(),
 				_scheduledPlaybackStoppedMutex(),
 				// _config( bmdModeHD1080p2997 ),								// Set a default
 				_enabled(false),
-				_parent( parent ),
-				_deckLink( parent.deckLink() ),
+				_deckLink( deckLink ),
 				_deckLinkOutput( nullptr ),
 				_totalFramesScheduled(0),
 				_buffer( new SharedBMSDIBuffer() ),
 				_blankFrame( nullptr )
 		{
-			_deckLink->AddRef();
+			_deckLink.AddRef();
 		}
 
 	OutputHandler::~OutputHandler(void)
 	{
 		if( _deckLinkOutput ) _deckLinkOutput->Release();
-		if( _deckLink ) _deckLink->Release();
+		 _deckLink.Release();
 	}
 
 
 	IDeckLinkOutput *OutputHandler::deckLinkOutput()
 	{
 		if( !_deckLinkOutput ) {
-			CHECK( S_OK == _deckLink->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput) )
+			CHECK( S_OK == _deckLink.deckLink()->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput) )
 										<< "Could not obtain the IDeckLinkInput interface - result = %08x";
 			CHECK(_deckLinkOutput != nullptr );
 		}
 
 		return _deckLinkOutput;
+	}
+
+	//== API functions =================================================
+	void OutputHandler::inputFormatChanged(BMDDisplayMode newMode) {
+	  LOG(INFO) << "In inputFormatChanged with mode "
+	            << displayModeToString(newMode);
+
+	  // Change output mode
+	  stopStreamsWait();
+
+	  disable();
+	  enable(newMode);
+
+	  LOG(INFO) << "Restarting streams";
+
+	  startStreams();
 	}
 
 	bool OutputHandler::enable( BMDDisplayMode mode, bool do3D )

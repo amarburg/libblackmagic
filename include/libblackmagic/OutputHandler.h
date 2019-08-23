@@ -19,10 +19,6 @@ namespace libblackmagic {
 		OutputHandler( DeckLink &parent );
 		virtual ~OutputHandler(void);
 
-		// Retrieve the current configuration
-    // InputConfig &config() { return _config; }
-		// void setConfig( const InputConfig &config ) { _config = config; }
-
 		// Lazy initializer
 		IDeckLinkOutput *deckLinkOutput();
 
@@ -38,7 +34,6 @@ namespace libblackmagic {
 
 		HRESULT	STDMETHODCALLTYPE ScheduledFrameCompleted(IDeckLinkVideoFrame* completedFrame, BMDOutputFrameCompletionResult result);
 		HRESULT	STDMETHODCALLTYPE ScheduledPlaybackHasStopped(void);
-
 
 		// Dummy implementations
 		HRESULT	STDMETHODCALLTYPE QueryInterface (REFIID iid, LPVOID *ppv){ return E_NOINTERFACE; }
@@ -66,8 +61,7 @@ namespace libblackmagic {
 
 		bool _enabled;
 
-		DeckLink &_parent;
-		IDeckLink *_deckLink;
+		DeckLink &_deckLink;
 		IDeckLinkOutput *_deckLinkOutput;
 
 		// Cached values

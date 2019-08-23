@@ -1,7 +1,7 @@
 
 fips_begin_app( bm_viewer cmdline )
   fips_files(
-    BmViewer.cpp
+    bm_viewer.cpp
   )
 
   fips_deps( blackmagic activeobject  )

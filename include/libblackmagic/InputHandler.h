@@ -19,9 +19,11 @@
 #include "SDICameraControl.h"
 #include "SDIMessageBuffer.h"
 
+#include "libblackmagic/DeckLink.h"
+
 namespace libblackmagic {
 
-  class DeckLink;
+  using std::vector;
 
   class InputHandler : public IDeckLinkInputCallback
   {
@@ -51,11 +53,12 @@ namespace libblackmagic {
     virtual HRESULT STDMETHODCALLTYPE VideoInputFormatChanged(BMDVideoInputFormatChangedEvents, IDeckLinkDisplayMode*, BMDDetectedVideoInputFormatFlags);
     virtual HRESULT STDMETHODCALLTYPE VideoInputFrameArrived(IDeckLinkVideoInputFrame*, IDeckLinkAudioInputPacket*);
 
-    Queue &queue() { return _queue; }
 
-    // polled interface
-    int grab( void );
-    int getRawImage( int i, cv::Mat &mat );
+    typedef std::function< void( const MatVector & ) > NewImagesCallback;
+    void setNewImagesCallback( NewImagesCallback callback );
+
+    typedef std::function< void(BMDDisplayMode mode) > InputFormatChangedCallback;
+    void setInputFormatChangedCallback( InputFormatChangedCallback );
 
     //
     ModeConfig currentConfig() const { return _currentConfig; }
@@ -76,15 +79,17 @@ namespace libblackmagic {
     ModeConfig _currentConfig;
     bool _enabled;
 
-    DeckLink &_parent;
-    IDeckLink *_deckLink;
+    DeckLink &_deckLink;
 
     IDeckLinkInput *_deckLinkInput;
     IDeckLinkConfiguration *_dlConfiguration;
 
     // == input member related variables ==
     MatVector _grabbedImages;
-    Queue _queue;
+    //Queue _queue;
+
+    NewImagesCallback _newImagesCallback;
+    InputFormatChangedCallback _inputFormatChangedCallback;
 
   };
 

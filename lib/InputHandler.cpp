@@ -16,23 +16,23 @@ using std::shared_ptr;
 using std::thread;
 using std::vector;
 
-InputHandler::InputHandler(DeckLink &parent)
+InputHandler::InputHandler( DeckLink &deckLink )
     : _frameCount(0), _noInputCount(0), _pixelFormat(bmdFormat10BitYUV),
-      _currentConfig(), _enabled(false), _parent(parent),
-      _deckLink(_parent.deckLink()), _deckLinkInput(nullptr),
+      _currentConfig(), _enabled(false),
+      _deckLink(deckLink),
+      _deckLinkInput(nullptr),
       _dlConfiguration(nullptr),
-      //_deckLinkOutput( nullptr ),
-      _grabbedImages(), _queue() {
-  _deckLink->AddRef();
+      _newImagesCallback( []( const MatVector &images ){;} ),
+      _inputFormatChangedCallback( []( BMDDisplayMode newMode ){;} )
+{
+  _deckLink.AddRef();
 
-  CHECK(_deckLink->QueryInterface(IID_IDeckLinkInput,
+  CHECK(_deckLink.deckLink()->QueryInterface(IID_IDeckLinkInput,
                                   (void **)&_deckLinkInput) == S_OK);
   CHECK(_deckLinkInput != NULL) << "Couldn't get DecklinkInput";
 
-  CHECK(_deckLink->QueryInterface(IID_IDeckLinkConfiguration,
+  CHECK(_deckLink.deckLink()->QueryInterface(IID_IDeckLinkConfiguration,
                                   (void **)&_dlConfiguration) == S_OK);
-
-  CHECK(_deckLink != nullptr);
 }
 
 InputHandler::~InputHandler() {
@@ -40,9 +40,8 @@ InputHandler::~InputHandler() {
     _deckLinkInput->Release();
   if (_dlConfiguration)
     _dlConfiguration->Release();
-  // if( _deckLinkOutput ) _deckLinkOutput->Release();
-  if (_deckLink)
-    _deckLink->Release();
+
+    _deckLink.Release();
 }
 
 ULONG InputHandler::AddRef(void) { return 1; }
@@ -61,7 +60,7 @@ bool InputHandler::enable(BMDDisplayMode mode, bool doAuto, bool do3D) {
   bool formatDetectionSupported;
 
   // Check the card supports format detection
-  auto result = _deckLink->QueryInterface(IID_IDeckLinkProfileAttributes,
+  auto result = _deckLink.deckLink()->QueryInterface(IID_IDeckLinkProfileAttributes,
                                           (void **)&deckLinkAttributes);
   if (result != S_OK) {
     LOG(WARNING) << "Unable to query deckLinkAttributes";
@@ -197,32 +196,44 @@ bool InputHandler::stopStreams() {
   return true;
 }
 
+void InputHandler::setNewImagesCallback( NewImagesCallback callback )
+{
+  _newImagesCallback = callback;
+}
+
+void InputHandler::setInputFormatChangedCallback( InputFormatChangedCallback callback )
+{
+  _inputFormatChangedCallback = callback;
+}
+
+
+
 //-------
 
-int InputHandler::grab(void) {
-
-  const int numImages = _currentConfig.do3D() ? 2 : 1;
-
-  // If there was nothing in the queue, wait
-  if (_queue.wait_for_pop(_grabbedImages, std::chrono::milliseconds(100)) ==
-      false) {
-    LOG(WARNING) << "Timeout waiting for image queue ";
-    return 0;
-  }
-
-  // Formerly checked for empty Mats here.  Still do that?
-  return numImages;
-}
-
-int InputHandler::getRawImage(int i, cv::Mat &mat) {
-
-  if (i == 0 || i == 1) {
-    mat = _grabbedImages[i];
-    return i;
-  }
-
-  return -1;
-}
+// int InputHandler::grab(void) {
+//
+//   const int numImages = _currentConfig.do3D() ? 2 : 1;
+//
+//   // If there was nothing in the queue, wait
+//   if (_queue.wait_for_pop(_grabbedImages, std::chrono::milliseconds(100)) ==
+//       false) {
+//     LOG(WARNING) << "Timeout waiting for image queue ";
+//     return 0;
+//   }
+//
+//   // Formerly checked for empty Mats here.  Still do that?
+//   return numImages;
+// }
+//
+// int InputHandler::getRawImage(int i, cv::Mat &mat) {
+//
+//   if (i == 0 || i == 1) {
+//     mat = _grabbedImages[i];
+//     return i;
+//   }
+//
+//   return -1;
+// }
 
 // ImageSize InputHandler::imageSize( void ) const
 // {
@@ -344,7 +355,7 @@ HRESULT InputHandler::VideoInputFormatChanged(
 
   // formatFlags & bmdDetectedVideoInputDualStream3D );
 
-  _queue.flush();
+  //_queue.flush();
 
   _currentConfig.setMode(mode->GetDisplayMode());
   //_currentConfig.set3D( formatFlags & bmdDetectedVideoInputDualStream3D );
@@ -354,11 +365,13 @@ HRESULT InputHandler::VideoInputFormatChanged(
   _deckLinkInput->FlushStreams();
   _deckLinkInput->StartStreams();
 
-  _parent.sendInputFormatChanged(mode->GetDisplayMode());
+  //_parent.inputFormatChanged(mode->GetDisplayMode());
 
   // And reconfigure output
-  LOG(INFO) << "Restarted streams at new mode "
-            << displayModeToString(mode->GetDisplayMode());
+  // LOG(INFO) << "Restarted streams at new mode "
+  //           << displayModeToString(mode->GetDisplayMode());
+
+  _inputFormatChangedCallback( mode->GetDisplayMode() );
 
   return S_OK;
 }
@@ -383,7 +396,10 @@ void InputHandler::process(FrameVector frameVector) {
   for (auto worker : workers)
     worker->join();
 
-  _queue.push(out);
+
+   _newImagesCallback( out );
+
+  //_queue.push(out);
 }
 
 void InputHandler::frameToMat(IDeckLinkVideoFrame *videoFrame, cv::Mat &out,
@@ -414,8 +430,8 @@ void InputHandler::frameToMat(IDeckLinkVideoFrame *videoFrame, cv::Mat &out,
     } else {
 
       IDeckLinkOutput *deckLinkOutput = NULL;
-      CHECK(_deckLink->QueryInterface(IID_IDeckLinkOutput,
-                                      (void **)&deckLinkOutput) == S_OK);
+      CHECK(_deckLink.deckLink()->QueryInterface(IID_IDeckLinkOutput,
+                                                (void **)&deckLinkOutput) == S_OK);
 
       IDeckLinkMutableVideoFrame *dstFrame = NULL;
       HRESULT result = deckLinkOutput->CreateVideoFrame(
