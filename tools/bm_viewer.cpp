@@ -187,7 +187,7 @@ int main( int argc, char** argv )
 	int stopAfter = -1;
 	app.add_option("--stop-after", stopAfter, "Stop after N frames");
 
-	float scale = 1.0;
+	float scale = 0.5;
 	app.add_option("--scale", scale, "Scale");
 
 	CLI11_PARSE(app, argc, argv);
@@ -242,12 +242,21 @@ int main( int argc, char** argv )
 		LOG(WARNING) << "Setting initial mode " << desiredModeString;
 	}
 
-	int count = 0, miss = 0, displayed = 0;
+	int count = 0, displayed = 0;
+
+	// OpenCV windows must be initialized in main thread...
+	if(!noDisplay) {
+		Mat mat( cv::Mat::zeros(100,100,CV_8UC3));
+		imshow("Composite", mat);
+		cv::waitKey(1);
+	}
 
 	// Set up callback
 	client.input().setNewImagesCallback( [&]( const InputHandler::MatVector &rawImages ) {
 
-		InputHandler::MatVector  images;
+		LOG(DEBUG) << "In callback";
+
+		InputHandler::MatVector images;
 
 		if( scale == 1.0 ) {
 			images = rawImages;

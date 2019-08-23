@@ -38,6 +38,7 @@ InputHandler::InputHandler( DeckLink &deckLink )
 InputHandler::~InputHandler() {
   if (_deckLinkInput)
     _deckLinkInput->Release();
+
   if (_dlConfiguration)
     _dlConfiguration->Release();
 
@@ -393,9 +394,7 @@ void InputHandler::process(FrameVector frameVector) {
   frameToMat(frameVector[0], out[0], 0);
 
   // Wait for any other threads to finish
-  for (auto worker : workers)
-    worker->join();
-
+  for (auto worker : workers) worker->join();
 
    _newImagesCallback( out );
 
@@ -465,7 +464,7 @@ void InputHandler::frameToMat(IDeckLinkVideoFrame *videoFrame, cv::Mat &out,
 
   // Regardless of what happens, release the frames
   auto refs = videoFrame->Release();
-  LOG(DEBUG) << frameName << " Releaseed frame; " << refs
+  LOG(DEBUG) << frameName << " Released frame; " << refs
              << " references remain";
 }
 
