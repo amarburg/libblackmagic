@@ -319,6 +319,8 @@ InputHandler::VideoInputFrameArrived(IDeckLinkVideoInputFrame *videoFrame,
 
   // \TODO Need to track these threads and wait for them all to finish before
   // destruction
+  //
+  // Move processing to a different thread
   std::thread t = std::thread([=] { process(frameVector); });
   t.detach();
 
@@ -399,8 +401,6 @@ void InputHandler::process(FrameVector frameVector) {
   for (auto worker : workers) worker->join();
 
    _newImagesCallback( out );
-
-  //_queue.push(out);
 }
 
 void InputHandler::frameToMat(IDeckLinkVideoFrame *videoFrame, cv::Mat &out,
