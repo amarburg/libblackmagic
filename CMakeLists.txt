@@ -57,7 +57,7 @@ else()
     active_object
     libbmsdi
   )
-  
+
   catkin_package(
     #CATKIN_DEPENDS g3log_catkin
     INCLUDE_DIRS include ${BLACKMAGIC_INCLUDE_DIR}
@@ -77,15 +77,10 @@ else()
     add_library(blackmagic_lib ${BLACKMAGIC_SRCS})
     target_link_libraries(blackmagic_lib ${catkin_LIBRARIES})
 
-    file(GLOB libblackmagic_SRCS
-	lib/*cpp
-      )
-
+    file(GLOB libblackmagic_SRCS lib/*.cpp )
 
     add_library(libblackmagic_LIB ${libblackmagic_SRCS})
     target_link_libraries(libblackmagic_LIB blackmagic_lib ${catkin_LIBRARIES})
-
-
 
     install(TARGETS libblackmagic_LIB
           ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
@@ -99,7 +94,7 @@ else()
         PATTERN ".git" EXCLUDE)
 
 
-  
+
 
 
 endif()
