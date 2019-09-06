@@ -15,7 +15,6 @@ namespace libblackmagic {
 				_scheduledPlaybackStoppedMutex(),
 				// _config( bmdModeHD1080p2997 ),								// Set a default
 				_enabled(false),
-				_foobar(true),
 				_running(false),
 				_deckLink( deckLink ),
 				_deckLinkOutput( nullptr ),
