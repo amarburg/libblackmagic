@@ -26,6 +26,7 @@ set( CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
 set( BLACKMAGIC_FORCE_LINUX TRUE )
 find_package( BlackmagicSDK REQUIRED )
 
+## Fips build path
 if (FIPS_CONFIG)
 	## Set global include paths
 	fips_include_directories(
@@ -49,6 +50,8 @@ if (FIPS_CONFIG)
 
 	  fips_finish()
 	endif()
+
+## Catkin build path
 else()
   project(libblackmagic)
 
@@ -61,7 +64,7 @@ else()
   catkin_package(
     #CATKIN_DEPENDS g3log_catkin
     INCLUDE_DIRS include ${BLACKMAGIC_INCLUDE_DIR}
-    LIBRARIES libblackmagic_LIB
+    LIBRARIES blackmagic_lib
   )
 
   include_directories(
@@ -72,17 +75,12 @@ else()
       #${g3log_catkin_INCLUDE_DIRS}
   )
 
-    find_path(BLACKMAGIC_SRCS DeckLinkAPIDispatch.cpp)
-    set(BLACKMAGIC_SRCS ${BLACKMAGIC_SRCS})
-    add_library(blackmagic_lib ${BLACKMAGIC_SRCS})
-    target_link_libraries(blackmagic_lib ${catkin_LIBRARIES})
+    file(GLOB libblackmagic_srcs lib/*.cpp )
 
-    file(GLOB libblackmagic_SRCS lib/*.cpp )
+    add_library(blackmagic_lib ${libblackmagic_srcs} ${BLACKMAGIC_SRCS} )
+    target_link_libraries(blackmagic_lib  ${catkin_LIBRARIES})
 
-    add_library(libblackmagic_LIB ${libblackmagic_SRCS})
-    target_link_libraries(libblackmagic_LIB blackmagic_lib ${catkin_LIBRARIES})
-
-    install(TARGETS libblackmagic_LIB
+    install(TARGETS blackmagic_lib
           ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
           LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
           RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})

@@ -15,6 +15,8 @@ namespace libblackmagic {
 				_scheduledPlaybackStoppedMutex(),
 				// _config( bmdModeHD1080p2997 ),								// Set a default
 				_enabled(false),
+				_foobar(true),
+				_running(false),
 				_deckLink( deckLink ),
 				_deckLinkOutput( nullptr ),
 				_totalFramesScheduled(0),
@@ -31,12 +33,13 @@ namespace libblackmagic {
 	}
 
 
+	// Lazy initializer for decklinkOutput
 	IDeckLinkOutput *OutputHandler::deckLinkOutput()
 	{
 		if( !_deckLinkOutput ) {
 			CHECK( S_OK == _deckLink.deckLink()->QueryInterface(IID_IDeckLinkOutput, (void**)&_deckLinkOutput) )
-										<< "Could not obtain the IDeckLinkInput interface - result = %08x";
-			CHECK(_deckLinkOutput != nullptr );
+										<< "Could not obtain the IDeckLinkOutput interface - result = %08x";
+			CHECK(_deckLinkOutput != nullptr ) << "IDeckLinkOutput is null";
 		}
 
 		return _deckLinkOutput;
@@ -128,10 +131,12 @@ namespace libblackmagic {
 
 
 
-	bool OutputHandler::startStreams() {
-			if( !_enabled && !enable() ) return false;
+	bool OutputHandler::startStreams()
+	{
+		if( _running ) return true;
+		if( !_enabled && !enable() ) return false;
 
-		LOG(DEBUG) << "Starting DeckLinkOutput streams ...";
+		LOG(INFO) << "Starting DeckLinkOutput streams ...";
 
 		// // Pre-roll a few blank frames
 		// const int prerollFrames = 3;
@@ -139,18 +144,22 @@ namespace libblackmagic {
 		// 	scheduleFrame(blankFrame());
 		// }
 
-		HRESULT result = _deckLinkOutput->StartScheduledPlayback(0, _timeScale, 1.0);
+		HRESULT result = deckLinkOutput()->StartScheduledPlayback(0, _timeScale, 1.0);
 		if(result != S_OK) {
 			LOG(WARNING) << "Could not start video output - result = " << std::hex << result;
 			return false;
 		}
 
+		_running = true;
 		return true;
 	}
 
+
 	bool OutputHandler::stopStreams()
 	{
-		LOG(DEBUG) << "Stopping DeckLinkOutput streams";
+		if( !_running ) return true;
+
+		LOG(INFO) << "Stopping DeckLinkOutput streams";
 
 		// And stop after one frame
 		BMDTimeValue actualStopTime;
@@ -160,6 +169,7 @@ namespace libblackmagic {
 			LOG(WARNING) << "Could not stop video playback - result = " << std::hex << result;
 		}
 
+		_running = true;
 		return true;
 	}
 
@@ -176,21 +186,21 @@ namespace libblackmagic {
 	}
 
 
-bool OutputHandler::disable()
-{
-	LOG(DEBUG) << "Disabling DecklinkOutput";
-
-	HRESULT result = deckLinkOutput()->DisableVideoOutput();
-	if(result != S_OK)
+	bool OutputHandler::disable()
 	{
-		LOG(WARNING) << "Could not disable output - result = " << std::hex << result;
-		return false;
+		LOG(DEBUG) << "Disabling DecklinkOutput";
+
+		HRESULT result = deckLinkOutput()->DisableVideoOutput();
+		if(result != S_OK)
+		{
+			LOG(WARNING) << "Could not disable output - result = " << std::hex << result;
+			return false;
+		}
+		return true;
 	}
-	return true;
-}
 
 
-	// Callbacks for sending out new frames
+	// == Callbacks for sending out new frames ==
 	void OutputHandler::scheduleFrame( IDeckLinkVideoFrame *frame, uint8_t numRepeats )
 	{
 		LOG(DEBUG) << "Scheduling frame " << _totalFramesScheduled;
@@ -240,7 +250,6 @@ bool OutputHandler::disable()
 
 	HRESULT	STDMETHODCALLTYPE OutputHandler::ScheduledPlaybackHasStopped(void) {
 		LOG(INFO) << "Scheduled playback has stopped!";
-
 		_scheduledPlaybackStoppedCond.notify_all();
 
 		return S_OK;

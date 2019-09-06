@@ -180,7 +180,7 @@ bool InputHandler::startStreams() {
 
   HRESULT result = _deckLinkInput->StartStreams();
   if (result != S_OK) {
-    LOG(WARNING) << "Failed to start input streams";
+    LOG(WARNING) << "Failed to start input streams " << result;
     return false;
   }
   return true;

@@ -16,6 +16,8 @@ namespace libblackmagic {
 	class OutputHandler: public IDeckLinkVideoOutputCallback
 	{
 	public:
+		bool _running;
+
 		OutputHandler( DeckLink &parent );
 		virtual ~OutputHandler(void);
 
@@ -59,7 +61,7 @@ namespace libblackmagic {
 
 	private:
 
-		bool _enabled;
+		bool _enabled, _running;
 
 		DeckLink &_deckLink;
 		IDeckLinkOutput *_deckLinkOutput;

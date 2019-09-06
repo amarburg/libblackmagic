@@ -12,37 +12,36 @@
 
 namespace libblackmagic {
 
-using std::string;
+  using std::string;
 
-InputOutputClient::InputOutputClient(int cardNo)
-    : _deckLink(cardNo),
-      //_configuration( nullptr ),
-      _input( _deckLink ),
-      _output( _deckLink )
- {
-   _input.setInputFormatChangedCallback( std::bind( &OutputHandler::inputFormatChanged, &_output, std::placeholders::_1 ) );
- }
+  InputOutputClient::InputOutputClient(int cardNo)
+      : _deckLink(cardNo),
+        //_configuration( nullptr ),
+        _input( _deckLink ),
+        _output( _deckLink )
+   {
+     _input.setInputFormatChangedCallback( std::bind( &OutputHandler::inputFormatChanged, &_output, std::placeholders::_1 ) );
+   }
 
-InputOutputClient::~InputOutputClient()
-{;}
+  InputOutputClient::~InputOutputClient()
+  {;}
 
-//=================================================================
+  //=================================================================
 
-bool InputOutputClient::startStreams(void) {
+  bool InputOutputClient::startStreams(void) {
 
-  // TODO.  Check responses
-  if (!_output.startStreams())
-    return false;
-  if (!_input.startStreams())
-    return false;
-  ;
+    // TODO.  Check responses
+    if (!_output.startStreams())
+      return false;
+    if (!_input.startStreams())
+      return false;
 
-  return true;
-}
+    return true;
+  }
 
-void InputOutputClient::stopStreams(void) {
-  _input.stopStreams();
-  _output.stopStreams();
-}
+  void InputOutputClient::stopStreams(void) {
+    _input.stopStreams();
+    _output.stopStreams();
+  }
 
 } // namespace libblackmagic
