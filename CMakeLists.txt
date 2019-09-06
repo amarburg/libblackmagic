@@ -68,11 +68,10 @@ else()
   )
 
   include_directories(
-      ${catkin_INCLUDE_DIRS}
       include
       ${BLACKMAGIC_INCLUDE_DIR}
       ${OpenCV_INCLUDE_DIRS}
-      #${g3log_catkin_INCLUDE_DIRS}
+      ${catkin_INCLUDE_DIRS}
   )
 
     file(GLOB libblackmagic_srcs lib/*.cpp )
