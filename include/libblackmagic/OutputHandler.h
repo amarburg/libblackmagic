@@ -25,8 +25,6 @@ namespace libblackmagic {
 		bool enable( BMDDisplayMode mode = bmdModeHD1080p2997, bool do3D = false );
 		bool disable();
 
-		//void setBMSDIBuffer( const std::shared_ptr<SharedBMBuffer> &buffer );
-
 		const std::shared_ptr<SharedBMSDIBuffer> &sdiProtocolBuffer()
 			{ return _buffer; }
 
@@ -44,10 +42,6 @@ namespace libblackmagic {
 
 		bool stopStreams( void );
 		bool stopStreamsWait( void );
-
-		// Condition variables
-		std::condition_variable _scheduledPlaybackStoppedCond;
-		std::mutex _scheduledPlaybackStoppedMutex;
 
 	protected:
 
@@ -68,12 +62,14 @@ namespace libblackmagic {
 		BMDTimeValue _frameDuration;
 		BMDTimeScale _timeScale;
 
-		//BMSDIBuffer *_bmsdiBuffer;
-
 		unsigned int _totalFramesScheduled;
 
 		std::shared_ptr<SharedBMSDIBuffer> _buffer;
 		IDeckLinkMutableVideoFrame *_blankFrame;
+
+		// Condition variables
+		std::condition_variable _scheduledPlaybackStoppedCond;
+		std::mutex _scheduledPlaybackStoppedMutex;
 
 	};
 
