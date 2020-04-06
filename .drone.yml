@@ -10,18 +10,24 @@ steps:
 - name: build-fips-unittest
   image: amarburg/lsdslam-dev-host
   commands:
+    - cd /drone && wget -O- https://s3.us-west-1.wasabisys.com/marburg/Blackmagic_DeckLink_SDK_11.5_Linux_only.tar.gz | tar xz
+    - export BLACKMAGIC_DIR="/drone/Blackmagic_DeckLink_SDK_11.5/Linux/"
     - ./fips set config linux-make-unittest
     - ./fips build
 
 - name: build-fips-release
   image: amarburg/lsdslam-dev-host
   commands:
+    - cd /drone && wget -O- https://s3.us-west-1.wasabisys.com/marburg/Blackmagic_DeckLink_SDK_11.5_Linux_only.tar.gz | tar xz
+    - export BLACKMAGIC_DIR="/drone/Blackmagic_DeckLink_SDK_11.5/Linux/"
     - ./fips set config linux-make-release
     - ./fips build
 
 - name: build-ros-melodic
   image: amarburg/drone-ci-ros:melodic
   commands:
+    - cd /drone && wget -O- https://s3.us-west-1.wasabisys.com/marburg/Blackmagic_DeckLink_SDK_11.5_Linux_only.tar.gz | tar xz
+    - export BLACKMAGIC_DIR="/drone/Blackmagic_DeckLink_SDK_11.5/Linux/"
     - wget -O- https://gitlab.com/amarburg/ros_drone_ci/-/raw/master/bootstrap.sh | /bin/bash
   environment:
 
