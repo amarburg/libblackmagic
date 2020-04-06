@@ -1,0 +1,4 @@
+- git: {local-name: g3log_catkin, uri: "https://gitlab.com/apl-ocean-engineering/g3log_catkin.git", version: master}
+- git: {local-name: active_object, uri: "https://github.com/apl-ocean-engineering/libactiveobject.git", version: ros}
+- git: {local-name: libbmsdi, uri: "https://github.com/apl-ocean-engineering/libbmsdi-protocol.git", version: master}
+
