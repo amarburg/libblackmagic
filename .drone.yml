@@ -13,15 +13,17 @@ steps:
     - apt update && apt install -y wget
     - cd /drone && wget -O- https://s3.us-west-1.wasabisys.com/marburg/Blackmagic_DeckLink_SDK_11.5_Linux_only.tar.gz | tar xz
     - export BLACKMAGIC_DIR="/drone/Blackmagic_DeckLink_SDK_11.5/Linux/"
+    - cd /drone/src
     - ./fips set config linux-make-unittest
     - ./fips build
 
 - name: build-fips-release
   image: amarburg/lsdslam-dev-host
   commands:
-    - apt update && apt install -y wget 
+    - apt update && apt install -y wget
     - cd /drone && wget -O- https://s3.us-west-1.wasabisys.com/marburg/Blackmagic_DeckLink_SDK_11.5_Linux_only.tar.gz | tar xz
     - export BLACKMAGIC_DIR="/drone/Blackmagic_DeckLink_SDK_11.5/Linux/"
+    - cd /drone/src
     - ./fips set config linux-make-release
     - ./fips build
 
