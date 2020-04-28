@@ -11,16 +11,16 @@
 namespace libblackmagic {
 
 	OutputHandler::OutputHandler( DeckLink &deckLink )
-			:  _scheduledPlaybackStoppedCond(),
-				_scheduledPlaybackStoppedMutex(),
-				// _config( bmdModeHD1080p2997 ),								// Set a default
+			:  // _config( bmdModeHD1080p2997 ),								// Set a default
 				_enabled(false),
 				_running(false),
 				_deckLink( deckLink ),
 				_deckLinkOutput( nullptr ),
 				_totalFramesScheduled(0),
 				_buffer( new SharedBMSDIBuffer() ),
-				_blankFrame( nullptr )
+				_blankFrame( nullptr ),
+				_scheduledPlaybackStoppedCond(),
+				_scheduledPlaybackStoppedMutex()
 		{
 			_deckLink.AddRef();
 		}

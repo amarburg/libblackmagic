@@ -6,7 +6,6 @@
 #include <g3log/logworker.hpp>
 
 #include "libblackmagic/InputHandler.h"
-
 #include "libblackmagic/DeckLink.h"
 
 namespace libblackmagic {
@@ -39,7 +38,7 @@ InputHandler::~InputHandler() {
   if (_deckLinkInput) {
     _deckLinkInput->Release();
   }
-  
+
   if (_dlConfiguration) {
     _dlConfiguration->Release();
   }
@@ -209,40 +208,6 @@ void InputHandler::setInputFormatChangedCallback( InputFormatChangedCallback cal
 {
   _inputFormatChangedCallback = callback;
 }
-
-
-
-//-------
-
-// int InputHandler::grab(void) {
-//
-//   const int numImages = _currentConfig.do3D() ? 2 : 1;
-//
-//   // If there was nothing in the queue, wait
-//   if (_queue.wait_for_pop(_grabbedImages, std::chrono::milliseconds(100)) ==
-//       false) {
-//     LOG(WARNING) << "Timeout waiting for image queue ";
-//     return 0;
-//   }
-//
-//   // Formerly checked for empty Mats here.  Still do that?
-//   return numImages;
-// }
-//
-// int InputHandler::getRawImage(int i, cv::Mat &mat) {
-//
-//   if (i == 0 || i == 1) {
-//     mat = _grabbedImages[i];
-//     return i;
-//   }
-//
-//   return -1;
-// }
-
-// ImageSize InputHandler::imageSize( void ) const
-// {
-// //   return _inputHandler->imageSize();
-// }
 
 //====== Input callbacks =====
 
