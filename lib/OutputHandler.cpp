@@ -76,7 +76,9 @@ namespace libblackmagic {
 		// }
 
 		result = deckLinkOutput()->DoesSupportVideoMode( bmdVideoConnectionSDI, mode,
-																										bmdFormat10BitYUV, outputFlags,
+																										bmdFormat10BitYUV,
+																										bmdNoVideoOutputConversion,
+																										outputFlags,
 																										&actualMode, &isSupported );
 	  if( result != S_OK) {
 	    LOG(WARNING) << "Could not query if output mode is supported (" << std::hex << result << ")";

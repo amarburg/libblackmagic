@@ -114,8 +114,10 @@ bool InputHandler::enable(BMDDisplayMode mode, bool doAuto, bool do3D) {
 
   // Check if desired mode and flags are supported
   bool isSupported = false;
+  BMDDisplayMode actualMode;
   result = _deckLinkInput->DoesSupportVideoMode(
-      bmdVideoConnectionSDI, mode, _pixelFormat, supportedFlags, &isSupported);
+      bmdVideoConnectionSDI, mode, _pixelFormat, bmdNoVideoOutputConversion,
+      supportedFlags, &actualMode, &isSupported);
 
   if (result != S_OK) {
     LOG(WARNING)
