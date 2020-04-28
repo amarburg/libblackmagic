@@ -34,6 +34,7 @@ steps:
     - export BLACKMAGIC_DIR="/drone/Blackmagic_DeckLink_SDK_11.5/Linux/"
     - wget -O- https://gitlab.com/amarburg/ros_drone_ci/-/raw/master/bootstrap.sh | /bin/bash
   environment:
+      ROS_PACKAGES_TO_INSTALL: cv-bridge
 
 
 # - name: trigger-gitlab-downstream
