@@ -36,13 +36,15 @@ InputHandler::InputHandler( DeckLink &deckLink )
 }
 
 InputHandler::~InputHandler() {
-  if (_deckLinkInput)
+  if (_deckLinkInput) {
     _deckLinkInput->Release();
-
-  if (_dlConfiguration)
+  }
+  
+  if (_dlConfiguration) {
     _dlConfiguration->Release();
+  }
 
-    _deckLink.Release();
+  _deckLink.Release();
 }
 
 ULONG InputHandler::AddRef(void) { return 1; }
@@ -115,8 +117,8 @@ bool InputHandler::enable(BMDDisplayMode mode, bool doAuto, bool do3D) {
   // Check if desired mode and flags are supported
   bool isSupported = false;
   BMDDisplayMode actualMode;
-  result = _deckLinkInput->DoesSupportVideoMode(
-      bmdVideoConnectionSDI, mode, _pixelFormat, bmdNoVideoOutputConversion,
+  result = _deckLinkInput->DoesSupportVideoMode( bmdVideoConnectionSDI,
+      mode, _pixelFormat, bmdNoVideoOutputConversion,
       supportedFlags, &actualMode, &isSupported);
 
   if (result != S_OK) {
@@ -140,8 +142,7 @@ bool InputHandler::enable(BMDDisplayMode mode, bool doAuto, bool do3D) {
       return false;
     }
 
-    CHECK(displayMode != nullptr)
-        << "Unable to find a video input mode with the desired properties";
+    CHECK(displayMode != nullptr) << "Unable to find a video input mode with the desired properties";
     LOG(INFO) << "Enabling video input with mode "
               << displayModeToString(displayMode->GetDisplayMode())
               << ((displayMode->GetFlags() & bmdDisplayModeSupports3D) ? " 3D"
