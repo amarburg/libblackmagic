@@ -72,38 +72,25 @@ static void processKbInput( char c, InputOutputClient &client ) {
 			case ';':
  					// Send positive aperture increment
  					LOG(INFO) << "Sending aperture increment to camera";
- 					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalApertureOffset( buffer, CamNum, 1 ); });
+ 					guard( []( BMSDIBuffer *buffer ){	bmAddApertureOrdinalOffset( buffer, CamNum, 1 ); });
  					break;
  			case '\'':
  					// Send negative aperture decrement
  					LOG(INFO) << "Sending aperture decrement to camera";
-					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalApertureOffset( buffer, CamNum, -1 ); });
+					guard( []( BMSDIBuffer *buffer ){	bmAddApertureOrdinalOffset( buffer, CamNum, -1 ); });
  					break;
 
 			//=== Shutter increment/decrement ===
 
-			// case '.':
-			// 		currentExposure -= 1000;
-			// 		if( currentExposure < 2000 ) currentExposure = 2000;
-			// 		LOG(INFO) << "Setting shutter to " << currentExposure << " us";
-			// 		guard( []( BMSDIBuffer *buffer ){	bmAddExposureMicroseconds( buffer, CamNum, currentExposure ); });
- 			// 		break;
- 			// case '/':
-			// 		currentExposure += 1000;
-			// 		if( currentExposure > 42000 ) currentExposure = 42000;
-			// 		LOG(INFO) << "Setting shutter to " << currentExposure << " us";
-			// 		guard( []( BMSDIBuffer *buffer ){	bmAddExposureMicroseconds( buffer, CamNum, currentExposure ); });
-			// 		break;
-
 			case '.':
 					if( currentExposure > 0 ) currentExposure--;
 					LOG(INFO) << "Setting exposure to " << currentExposure << "";
-					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalExposure( buffer, CamNum, currentExposure ); });
+					guard( []( BMSDIBuffer *buffer ){	bmAddExposureOrdinal( buffer, CamNum, currentExposure ); });
  					break;
  			case '/':
 					currentExposure++;
 					LOG(INFO) << "Setting exposure to " << currentExposure << " us";
-					guard( []( BMSDIBuffer *buffer ){	bmAddOrdinalExposure( buffer, CamNum, currentExposure ); });
+					guard( []( BMSDIBuffer *buffer ){	bmAddExposureOrdinal( buffer, CamNum, currentExposure ); });
 					break;
 
 			//=== Gain increment/decrement ===
