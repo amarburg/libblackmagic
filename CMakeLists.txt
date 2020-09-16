@@ -65,7 +65,7 @@ else()
   catkin_package(
     #CATKIN_DEPENDS g3log_catkin
     INCLUDE_DIRS include ${BLACKMAGIC_INCLUDE_DIR}
-    LIBRARIES blackmagic_lib
+    LIBRARIES blackmagic
   )
 
   include_directories(
@@ -77,10 +77,10 @@ else()
 
     file(GLOB libblackmagic_srcs lib/*.cpp )
 
-    add_library(blackmagic_lib ${libblackmagic_srcs} ${BLACKMAGIC_SRCS} )
-    target_link_libraries(blackmagic_lib  ${catkin_LIBRARIES})
+    add_library(blackmagic ${libblackmagic_srcs} ${BLACKMAGIC_SRCS} )
+    target_link_libraries(blackmagic  ${catkin_LIBRARIES})
 
-    install(TARGETS blackmagic_lib
+    install(TARGETS blackmagic
           ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
           LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
           RUNTIME DESTINATION ${CATKIN_GLOBAL_BIN_DESTINATION})

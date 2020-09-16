@@ -183,7 +183,7 @@ IDeckLink *DeckLink::CreateDeckLink(int cardNo) {
     profileAttributes->Release();
   }
 
-  // LOG(INFO) << "Using card " << cardNo << " model name: " << modelName << ";
+  LOG(INFO) << "Using card " << cardNo << " model name: " << modelName;
   // display name: " << displayName;
 
   free(modelName);

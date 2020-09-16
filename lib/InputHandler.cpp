@@ -26,8 +26,13 @@ InputHandler::InputHandler( DeckLink &deckLink )
 {
   _deckLink.AddRef();
 
-  CHECK(_deckLink.deckLink()->QueryInterface(IID_IDeckLinkInput,
-                                  (void **)&_deckLinkInput) == S_OK);
+  auto result = _deckLink.deckLink()->QueryInterface(IID_IDeckLinkInput,
+                                  (void **)&_deckLinkInput);
+
+  LOG(WARNING) << result;
+
+  CHECK( result == S_OK);
+
   CHECK(_deckLinkInput != NULL) << "Couldn't get DecklinkInput";
 
   CHECK(_deckLink.deckLink()->QueryInterface(IID_IDeckLinkConfiguration,
